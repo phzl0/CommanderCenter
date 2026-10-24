@@ -14,6 +14,8 @@ from app.core.config import settings
 
 ALLOWED_HOSTS = {
     "api.github.com",
+    "api.open-meteo.com",
+    "geocoding-api.open-meteo.com",
     "api.bcb.gov.br",
     "servicodados.ibge.gov.br",
     "agenciabrasil.ebc.com.br",
@@ -331,4 +333,179 @@ def stock_data(symbol, start, end):
             }
         ],
         "data_date": points[-1]["label"] if points else None,
+    }
+
+
+def stock_query(text):
+    """Recognized links are parsed locally, never fetched as arbitrary websites."""
+    from urllib.parse import unquote
+
+    text = text.strip()
+    if text.startswith(("https://", "http://")):
+        parsed = urlparse(text)
+        host = (parsed.hostname or "").lower()
+        parts = [unquote(p) for p in parsed.path.split("/") if p]
+        if host == "finance.yahoo.com" and len(parts) >= 2 and parts[0] == "quote":
+            return parts[1]
+        if (
+            host in ("www.google.com", "google.com")
+            and len(parts) >= 3
+            and parts[:2] == ["finance", "quote"]
+        ):
+            return parts[2].split(":")[0]
+        if (
+            host in ("www.tradingview.com", "tradingview.com")
+            and len(parts) >= 2
+            and parts[0] == "symbols"
+        ):
+            return parts[1].split("-", 1)[-1]
+        raise ProviderError(
+            "Link não reconhecido. Use Yahoo Finance, Google Finance ou TradingView, ou pesquise pelo nome/código."
+        )
+    return text
+
+
+def company_search(text):
+    from urllib.parse import urlencode
+
+    query = stock_query(text)
+    if not query or len(query) > 100:
+        raise ProviderError("Informe um nome ou código com até 100 caracteres.")
+    if not settings.alpha_vantage_api_key:
+        return {
+            "status": "needs_config",
+            "message": "A busca e validação de listagens exige ALPHA_VANTAGE_API_KEY no .env. Você pode informar um código manualmente, sujeito à confirmação pelo provedor.",
+            "query": query,
+            "matches": [],
+        }
+    raw = get_json(
+        "https://www.alphavantage.co/query?"
+        + urlencode(
+            {
+                "function": "SYMBOL_SEARCH",
+                "keywords": query,
+                "apikey": settings.alpha_vantage_api_key,
+            }
+        )
+    )
+    if "bestMatches" not in raw:
+        raise ProviderError(
+            "Busca indisponível. Confira a chave e o limite do seu plano Alpha Vantage."
+        )
+    matches = [
+        {
+            "symbol": r.get("1. symbol", ""),
+            "name": r.get("2. name", ""),
+            "type": r.get("3. type", ""),
+            "exchange": r.get("4. region", ""),
+            "currency": r.get("8. currency", ""),
+            "verified": True,
+        }
+        for r in raw["bestMatches"][:10]
+    ]
+    return {
+        "status": "ok",
+        "message": "Selecione a listagem. Bolsa/região e moeda ajudam a distinguir ativos diferentes.",
+        "query": query,
+        "matches": matches,
+    }
+
+
+def city_search(query):
+    from urllib.parse import urlencode
+
+    raw = get_json(
+        "https://geocoding-api.open-meteo.com/v1/search?"
+        + urlencode({"name": query, "count": 8, "language": "pt", "format": "json"})
+    )
+    return [
+        {
+            "name": r["name"],
+            "region": r.get("admin1", ""),
+            "country": r.get("country", ""),
+            "latitude": r["latitude"],
+            "longitude": r["longitude"],
+            "label": ", ".join(
+                filter(None, [r["name"], r.get("admin1"), r.get("country")])
+            ),
+        }
+        for r in raw.get("results", [])
+    ]
+
+
+def weather_label(code):
+    if code == 0:
+        return "Céu limpo"
+    if code in (1, 2, 3):
+        return "Parcialmente nublado" if code != 3 else "Nublado"
+    if code in (45, 48):
+        return "Nevoeiro"
+    if code in (51, 53, 55, 56, 57):
+        return "Garoa"
+    if code in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "Chuva"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "Neve"
+    if code in (95, 96, 99):
+        return "Trovoadas"
+    return "Condição não informada"
+
+
+def weather_data(latitude, longitude, city):
+    if latitude is None or longitude is None:
+        return {
+            "status": "needs_config",
+            "source": "Open-Meteo",
+            "message": "Pesquise e selecione sua cidade na configuração do painel.",
+        }
+    from urllib.parse import urlencode
+
+    raw = get_json(
+        "https://api.open-meteo.com/v1/forecast?"
+        + urlencode(
+            {
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
+                "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                "forecast_days": 7,
+                "timezone": "auto",
+            }
+        )
+    )
+    current = raw.get("current", {})
+    daily = raw.get("daily", {})
+    days = []
+    for i, day in enumerate(daily.get("time", [])[:7]):
+        days.append(
+            {
+                "date": day,
+                "code": daily["weather_code"][i],
+                "condition": weather_label(daily["weather_code"][i]),
+                "max": daily["temperature_2m_max"][i],
+                "min": daily["temperature_2m_min"][i],
+                "rain": daily.get("precipitation_probability_max", [None] * 7)[i],
+            }
+        )
+    code = current.get("weather_code")
+    return {
+        "status": "ok" if current else "empty",
+        "source": "Open-Meteo",
+        "message": "Condições modeladas e previsão; não substituem alertas oficiais da Defesa Civil. Horários no fuso da localidade.",
+        "city": city,
+        "weather": {
+            "temperature": current.get("temperature_2m"),
+            "feels_like": current.get("apparent_temperature"),
+            "code": code,
+            "condition": weather_label(code),
+            "wind": current.get("wind_speed_10m"),
+            "time": current.get("time"),
+            "timezone": raw.get("timezone"),
+            "days": days,
+        },
+        "link": "https://open-meteo.com/",
+        "suggestions": [
+            "Confira a previsão dos próximos dias antes de planejar atividades ao ar livre.",
+            "Para risco severo, consulte os órgãos oficiais locais.",
+        ],
     }

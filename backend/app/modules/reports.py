@@ -228,6 +228,8 @@ def create_report(
             else model.created_at
         )
         query = select(model).where(model.owner_id == user.id)
+        if model in (PersonalEntry, FinanceEntry):
+            query = query.where(model.deleted_at.is_(None))
         if data.date_from:
             query = query.where(
                 field

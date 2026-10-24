@@ -29,10 +29,21 @@ from app.models import (
 from app.modules.management import StrictModel, owned, dump
 from app.modules.files import read_import
 from app.modules.data_service import AnalysisConfig, analyze, records
-from app.modules import providers
+from app.modules import providers, newsroom
+from app.modules.notifications import record
 
 router = APIRouter(prefix="/api/intelligence", tags=["Centro de informações"])
-KINDS = ["tasks", "personal", "finance", "github", "news", "macro", "stock", "analysis"]
+KINDS = [
+    "tasks",
+    "personal",
+    "finance",
+    "github",
+    "news",
+    "macro",
+    "stock",
+    "analysis",
+    "weather",
+]
 
 
 class WidgetConfig(StrictModel):
@@ -50,12 +61,30 @@ class WidgetConfig(StrictModel):
     y_column: str = Field(default="", max_length=300)
     aggregation: Literal["sum", "mean", "count"] = "sum"
     metric: Literal["minutes", "events"] = "minutes"
+    news_source_ids: list[str] = Field(default_factory=list, max_length=6)
+    news_category: str = Field(default="", max_length=80)
+    news_keywords: str = Field(default="", max_length=300)
+    news_exclude: str = Field(default="", max_length=300)
+    stock_name: str = Field(default="", max_length=150)
+    stock_exchange: str = Field(default="", max_length=100)
+    stock_currency: str = Field(default="", max_length=20)
+    city: str = Field(default="", max_length=200)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class WidgetInput(StrictModel):
     title: str = Field(min_length=1, max_length=100)
     kind: Literal[
-        "tasks", "personal", "finance", "github", "news", "macro", "stock", "analysis"
+        "tasks",
+        "personal",
+        "finance",
+        "github",
+        "news",
+        "macro",
+        "stock",
+        "analysis",
+        "weather",
     ]
     visible: bool = True
     wide: bool = False
@@ -88,7 +117,10 @@ def widgets_for(db, user):
     return list(
         db.scalars(
             select(DashboardWidget)
-            .where(DashboardWidget.owner_id == user.id)
+            .where(
+                DashboardWidget.owner_id == user.id,
+                DashboardWidget.deleted_at.is_(None),
+            )
             .order_by(DashboardWidget.position, DashboardWidget.created_at)
         )
     )
@@ -103,6 +135,8 @@ def public_widget(row):
 
 
 def check_config(db, user, data):
+    for source_id in data.config.news_source_ids:
+        newsroom.active_source(db, user, source_id)
     if data.config.analysis_id:
         owned(db, Analysis, data.config.analysis_id, user)
 
@@ -133,6 +167,8 @@ def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user))
                 )
             )
         db.commit()
+    newsroom.ensure_sources(db, user)
+    db.commit()
     return {
         "days": workspace.days,
         "widgets": [public_widget(w) for w in widgets_for(db, user)],
@@ -180,7 +216,7 @@ def edit_widget(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    row = owned(db, DashboardWidget, identity, user)
+    row = active_widget(db, user, identity)
     check_config(db, user, data)
     for key, value in data.model_dump().items():
         setattr(row, key, value)
@@ -195,8 +231,10 @@ def edit_widget(
 def delete_widget(
     identity: str, db: Session = Depends(get_db), user: User = Depends(current_user)
 ):
-    row = owned(db, DashboardWidget, identity, user)
-    db.delete(row)
+    row = active_widget(db, user, identity)
+    if row.deleted_at:
+        raise HTTPException(404, "Registro não encontrado.")
+    row.deleted_at = now()
     db.commit()
 
 
@@ -226,7 +264,7 @@ def entries(
         dump(r)
         for r in db.scalars(
             select(model)
-            .where(model.owner_id == user.id)
+            .where(model.owner_id == user.id, model.deleted_at.is_(None))
             .order_by(model.entry_date.desc(), model.created_at.desc())
             .limit(100)
         )
@@ -253,6 +291,8 @@ def edit_personal(
     user: User = Depends(current_user),
 ):
     row = owned(db, PersonalEntry, identity, user)
+    if row.deleted_at:
+        raise HTTPException(404, "Registro não encontrado.")
     for k, v in data.model_dump().items():
         setattr(row, k, v)
     db.commit()
@@ -283,6 +323,8 @@ def edit_finance(
     user: User = Depends(current_user),
 ):
     row = owned(db, FinanceEntry, identity, user)
+    if row.deleted_at:
+        raise HTTPException(404, "Registro não encontrado.")
     for k, v in data.model_dump(exclude={"amount"}).items():
         setattr(row, k, v)
     row.amount_cents = int(data.amount * 100)
@@ -300,7 +342,9 @@ def remove_entry(
     row = owned(
         db, PersonalEntry if kind == "personal" else FinanceEntry, identity, user
     )
-    db.delete(row)
+    if row.deleted_at:
+        raise HTTPException(404, "Registro não encontrado.")
+    row.deleted_at = now()
     db.commit()
 
 
@@ -325,6 +369,7 @@ def internal_data(db, user, kind, config, start, end):
             db.scalars(
                 select(PersonalEntry).where(
                     PersonalEntry.owner_id == user.id,
+                    PersonalEntry.deleted_at.is_(None),
                     PersonalEntry.entry_date >= start,
                     PersonalEntry.entry_date <= end,
                 )
@@ -365,6 +410,7 @@ def internal_data(db, user, kind, config, start, end):
             db.scalars(
                 select(FinanceEntry).where(
                     FinanceEntry.owner_id == user.id,
+                    FinanceEntry.deleted_at.is_(None),
                     FinanceEntry.entry_date >= start,
                     FinanceEntry.entry_date <= end,
                 )
@@ -499,13 +545,13 @@ def widget_data(
 ):
     if days not in (7, 30, 90):
         raise HTTPException(422, "Escolha 7, 30 ou 90 dias.")
-    row = owned(db, DashboardWidget, identity, user)
+    row = active_widget(db, user, identity)
     config = WidgetConfig(**row.config)
     start, end = date_range(days)
     key = hashlib.sha256(
         json.dumps([days, end.isoformat(), row.config], sort_keys=True).encode()
     ).hexdigest()
-    external = row.kind in ("github", "news", "macro", "stock")
+    external = row.kind in ("github", "news", "macro", "stock", "weather")
     if (
         external
         and row.cached_data is not None
@@ -513,8 +559,13 @@ def widget_data(
         and row.cached_at
         and (now() - row.cached_at).total_seconds() < (30 if refresh else 600)
     ):
+        cached = (
+            newsroom.annotate(db, user, row.cached_data)
+            if row.kind == "news"
+            else row.cached_data
+        )
         return {
-            **row.cached_data,
+            **cached,
             "as_of": row.cached_at.isoformat() + "Z",
             "cached": True,
         }
@@ -526,14 +577,27 @@ def widget_data(
         elif row.kind == "github":
             data = providers.github_data(config.repository, start, end)
         elif row.kind == "news":
-            data = providers.news_data(config.feed, start, end)
+            data = newsroom.aggregate(db, user, config, start, end, refresh)
         elif row.kind == "macro":
             data = providers.macro_data(config.series, start, end)
+        elif row.kind == "weather":
+            data = providers.weather_data(
+                config.latitude, config.longitude, config.city
+            )
         elif row.kind == "stock":
             data = providers.stock_data(config.symbol, start, end)
         else:
             raise HTTPException(422, "Tipo de painel inválido.")
     except providers.ProviderError as error:
+        record(
+            db,
+            user,
+            "Painel sem atualização",
+            row.title + ": " + str(error),
+            level="warning",
+            fingerprint="widget:" + row.id,
+        )
+        db.commit()
         return {
             "status": "unavailable",
             "message": str(error),
@@ -542,6 +606,7 @@ def widget_data(
                 "news": "Notícias",
                 "macro": "Banco Central",
                 "stock": "Alpha Vantage",
+                "weather": "Open-Meteo",
             }.get(row.kind, ""),
             "as_of": None,
         }
@@ -553,6 +618,15 @@ def widget_data(
             "as_of": None,
         }
     except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
+        record(
+            db,
+            user,
+            "Dados incompatíveis na fonte",
+            row.title,
+            level="warning",
+            fingerprint="format:" + row.id,
+        )
+        db.commit()
         return {
             "status": "unavailable",
             "message": "A fonte retornou dados incompatíveis. Tente atualizar mais tarde.",
@@ -564,4 +638,40 @@ def widget_data(
         row.cached_at = stamp
         row.cache_key = key
         db.commit()
+    if row.kind == "news":
+        data = newsroom.annotate(db, user, data)
     return {**data, "as_of": stamp.isoformat() + "Z", "cached": False}
+
+
+def active_widget(db, user, identity):
+    row = owned(db, DashboardWidget, identity, user)
+    if row.deleted_at:
+        raise HTTPException(404, "Painel não encontrado.")
+    return row
+
+
+@router.get("/widgets/{identity}")
+def get_widget(
+    identity: str, db: Session = Depends(get_db), user: User = Depends(current_user)
+):
+    return public_widget(active_widget(db, user, identity))
+
+
+@router.get("/company-search")
+def company_search(
+    q: str = Query(min_length=2, max_length=300), user: User = Depends(current_user)
+):
+    try:
+        return providers.company_search(q)
+    except providers.ProviderError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.get("/city-search")
+def city_search(
+    q: str = Query(min_length=2, max_length=100), user: User = Depends(current_user)
+):
+    try:
+        return providers.city_search(q)
+    except providers.ProviderError as e:
+        raise HTTPException(422, str(e))

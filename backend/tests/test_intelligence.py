@@ -1,6 +1,6 @@
 from datetime import date
 import pytest
-from app.modules import providers
+from app.modules import providers, newsroom
 from app.core.config import settings
 from tests.conftest import login_b
 
@@ -160,7 +160,7 @@ def test_providers_cache_and_failure_isolation(client, monkeypatch):
     def failed(*args):
         raise providers.ProviderError("Fonte temporariamente indisponível.")
 
-    monkeypatch.setattr(providers, "news_data", failed)
+    monkeypatch.setattr(newsroom, "aggregate", failed)
     w = get_kind(workspace, "news")
     assert (
         client.get(f"/api/intelligence/widgets/{w['id']}/data").json()["status"]

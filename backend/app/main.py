@@ -5,14 +5,24 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 from app.core.db import get_db
 from app.core.config import settings
-from app.modules import auth, management, files, reports, intelligence
+from app.modules import (
+    auth,
+    management,
+    files,
+    reports,
+    intelligence,
+    notifications,
+    newsroom,
+)
 
-app = FastAPI(title="Command Center", version="0.2.0")
+app = FastAPI(title="Command Center", version="0.3.0")
 app.include_router(auth.router)
 app.include_router(management.router)
 app.include_router(files.router)
 app.include_router(reports.router)
 app.include_router(intelligence.router)
+app.include_router(notifications.router)
+app.include_router(newsroom.router)
 
 
 @app.middleware("http")

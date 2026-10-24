@@ -146,6 +146,7 @@ class WorkspaceSettings(Base):
 
 class DashboardWidget(Owned, Base):
     __tablename__ = "dashboard_widgets"
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     title: Mapped[str] = mapped_column(String(100))
     kind: Mapped[str] = mapped_column(String(20))
     visible: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -159,6 +160,7 @@ class DashboardWidget(Owned, Base):
 
 class PersonalEntry(Owned, Base):
     __tablename__ = "personal_entries"
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     label: Mapped[str] = mapped_column(String(100))
     minutes: Mapped[int] = mapped_column(Integer)
     entry_date: Mapped[date] = mapped_column(Date, index=True)
@@ -167,6 +169,7 @@ class PersonalEntry(Owned, Base):
 
 class FinanceEntry(Owned, Base):
     __tablename__ = "finance_entries"
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     description: Mapped[str] = mapped_column(String(160))
     category: Mapped[str] = mapped_column(String(80))
     direction: Mapped[str] = mapped_column(String(10))
@@ -176,3 +179,46 @@ class FinanceEntry(Owned, Base):
         CheckConstraint("direction IN ('income','expense')"),
         CheckConstraint("amount_cents > 0"),
     )
+
+
+class SourceSettings(Base):
+    __tablename__ = "source_settings"
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+
+
+class NewsSource(Owned, Base):
+    __tablename__ = "news_sources"
+    name: Mapped[str] = mapped_column(String(100))
+    category: Mapped[str] = mapped_column(String(80))
+    url: Mapped[str] = mapped_column(String(2048))
+    kind: Mapped[str] = mapped_column(String(10), default="rss")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    cached_items: Mapped[list | None] = mapped_column(JSON)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Notification(Owned, Base):
+    __tablename__ = "notifications"
+    title: Mapped[str] = mapped_column(String(160))
+    message: Mapped[str] = mapped_column(String(500), default="")
+    level: Mapped[str] = mapped_column(String(10), default="success")
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+    fingerprint: Mapped[str | None] = mapped_column(String(160), index=True)
+    action: Mapped[dict | None] = mapped_column(JSON)
+
+
+class ArticleState(Owned, Base):
+    __tablename__ = "article_states"
+    __table_args__ = (UniqueConstraint("owner_id", "article_key"),)
+    article_key: Mapped[str] = mapped_column(String(64))
+    url: Mapped[str] = mapped_column(String(2048))
+    title: Mapped[str] = mapped_column(String(500))
+    source: Mapped[str] = mapped_column(String(100), default="")
+    category: Mapped[str] = mapped_column(String(80), default="")
+    image: Mapped[str] = mapped_column(String(2048), default="")
+    description: Mapped[str] = mapped_column(String(1000), default="")
+    published_date: Mapped[str] = mapped_column(String(40), default="")
+    bookmarked: Mapped[bool] = mapped_column(Boolean, default=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime)
