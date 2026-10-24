@@ -1,3 +1,15 @@
+# Atualização: centro de informações 0.2
+
+- 22 testes de API aprovados, incluindo preferências, painéis, registros pessoais/financeiros, exportações e isolamento por usuário.
+- Build, PostgreSQL 17, Docker, navegação desktop/celular e persistência aprovados no run https://github.com/phzl0/CommanderCenter/actions/runs/40128819907.
+- Teste por navegador cobre retirada de Projetos/Atividades do menu, registro de estudo e receita, ocultação/reordenação persistente após atualizar a página e gráfico de análise salva.
+- Capturas de desktop e celular revisadas. Fontes externas são fixtures explicitamente identificadas nos testes; disponibilidade ao vivo e uma chave real Alpha Vantage não são validadas pela suíte.
+- A migração adiciona quatro tabelas, sem remover os registros existentes. Execução na instalação pessoal ainda precisa da atualização pelo usuário.
+
+Consulte [intelligence-workspace.md](intelligence-workspace.md) para uso e limites.
+
+---
+
 # Verificação do MVP 1
 
 ## Resultados confirmados

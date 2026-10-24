@@ -163,7 +163,15 @@ export function Reports() {
                   <span className="badge">{r.format.toUpperCase()}</span>
                 </h3>
                 <p>
-                  {labels[r.parameters.dataset]} · {timeLabel(r.created_at)}
+                  {labels[r.parameters.dataset] ||
+                    (
+                      {
+                        projects: "Projetos (histórico)",
+                        activities: "Atividades (histórico)",
+                      } as Record<string, string>
+                    )[r.parameters.dataset] ||
+                    "Relatório"}{" "}
+                  · {timeLabel(r.created_at)}
                 </p>
               </div>
               <button disabled={busy} onClick={() => get(r)}>

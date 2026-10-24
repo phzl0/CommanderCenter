@@ -7,7 +7,7 @@ from app.core.db import get_db
 from app.core.config import settings
 from app.modules import auth, management, files, reports, intelligence
 
-app = FastAPI(title="Command Center", version="0.1.0")
+app = FastAPI(title="Command Center", version="0.2.0")
 app.include_router(auth.router)
 app.include_router(management.router)
 app.include_router(files.router)

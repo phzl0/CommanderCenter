@@ -552,7 +552,7 @@ def widget_data(
             "source": "Sua análise salva",
             "as_of": None,
         }
-    except (ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
         return {
             "status": "unavailable",
             "message": "A fonte retornou dados incompatíveis. Tente atualizar mais tarde.",

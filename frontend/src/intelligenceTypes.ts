@@ -118,5 +118,5 @@ export const formatValue = (n: number | null, unit = "") =>
     ? "—"
     : unit === "R$"
       ? n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-      : n.toLocaleString("pt-BR", { maximumFractionDigits: unit ? 2 : 0 }) +
+      : n.toLocaleString("pt-BR", { maximumFractionDigits: 4 }) +
         (unit ? " " + unit : "");

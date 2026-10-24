@@ -81,6 +81,7 @@ export default function WidgetChart({
             {axes}
             {data.series.map((s) => (
               <Bar
+                isAnimationActive={false}
                 key={s.key}
                 dataKey={s.key}
                 name={s.name}
@@ -95,6 +96,7 @@ export default function WidgetChart({
             {axes}
             {data.series.map((s) => (
               <Line
+                isAnimationActive={false}
                 key={s.key}
                 dataKey={s.key}
                 name={s.name}
@@ -126,6 +128,7 @@ export default function WidgetChart({
             {axes}
             {data.series.map((s, i) => (
               <Area
+                isAnimationActive={false}
                 key={s.key}
                 type="monotone"
                 dataKey={s.key}
