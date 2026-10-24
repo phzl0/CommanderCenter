@@ -12,6 +12,7 @@ from sqlalchemy import (
     JSON,
     Integer,
     Boolean,
+    BigInteger,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.db import Base
@@ -135,3 +136,43 @@ class Report(Owned, Base):
     format: Mapped[str] = mapped_column(String(10))
     stored_name: Mapped[str] = mapped_column(String(80), unique=True)
     parameters: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class WorkspaceSettings(Base):
+    __tablename__ = "workspace_settings"
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    days: Mapped[int] = mapped_column(Integer, default=30)
+
+
+class DashboardWidget(Owned, Base):
+    __tablename__ = "dashboard_widgets"
+    title: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(20))
+    visible: Mapped[bool] = mapped_column(Boolean, default=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    wide: Mapped[bool] = mapped_column(Boolean, default=False)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    cached_data: Mapped[dict | None] = mapped_column(JSON)
+    cached_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cache_key: Mapped[str | None] = mapped_column(String(64))
+
+
+class PersonalEntry(Owned, Base):
+    __tablename__ = "personal_entries"
+    label: Mapped[str] = mapped_column(String(100))
+    minutes: Mapped[int] = mapped_column(Integer)
+    entry_date: Mapped[date] = mapped_column(Date, index=True)
+    __table_args__ = (CheckConstraint("minutes > 0 AND minutes <= 1440"),)
+
+
+class FinanceEntry(Owned, Base):
+    __tablename__ = "finance_entries"
+    description: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(80))
+    direction: Mapped[str] = mapped_column(String(10))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    entry_date: Mapped[date] = mapped_column(Date, index=True)
+    __table_args__ = (
+        CheckConstraint("direction IN ('income','expense')"),
+        CheckConstraint("amount_cents > 0"),
+    )

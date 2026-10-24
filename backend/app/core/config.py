@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://command_center:command_center@localhost:5432/command_center"
     storage_dir: Path = Path("storage")
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    alpha_vantage_api_key: str = ""
     cookie_secure: bool = False
     session_hours: int = 12
     max_upload_mb: int = 10

@@ -19,7 +19,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from app.core.db import get_db
 from app.core.security import current_user
-from app.models import User, Project, Task, Activity, ImportFile, Analysis, Report
+from app.models import (
+    User,
+    Project,
+    Task,
+    Activity,
+    ImportFile,
+    Analysis,
+    Report,
+    PersonalEntry,
+    FinanceEntry,
+)
 from app.modules.management import StrictModel, owned, dump
 from app.modules.files import storage_path, read_import
 from app.modules.data_service import AnalysisConfig, analyze
@@ -30,7 +40,9 @@ router = APIRouter(prefix="/api/reports", tags=["Relatórios"])
 class ReportInput(StrictModel):
     title: str = Field(min_length=1, max_length=160)
     format: Literal["csv", "xlsx", "pdf"] = "pdf"
-    dataset: Literal["projects", "tasks", "activities", "analysis"] = "tasks"
+    dataset: Literal[
+        "projects", "tasks", "activities", "personal", "finance", "analysis"
+    ] = "tasks"
     analysis_id: str | None = None
     date_from: date | None = None
     date_to: date | None = None
@@ -201,15 +213,39 @@ def create_report(
         df, _ = read_import(row, config.sheet)
         df, summary, groups = analyze(df, config)
     else:
-        model = {"projects": Project, "tasks": Task, "activities": Activity}[
-            data.dataset
-        ]
-        field = model.occurred_at if model is Activity else model.created_at
+        model = {
+            "projects": Project,
+            "tasks": Task,
+            "activities": Activity,
+            "personal": PersonalEntry,
+            "finance": FinanceEntry,
+        }[data.dataset]
+        field = (
+            model.occurred_at
+            if model is Activity
+            else model.entry_date
+            if model in (PersonalEntry, FinanceEntry)
+            else model.created_at
+        )
         query = select(model).where(model.owner_id == user.id)
         if data.date_from:
-            query = query.where(field >= datetime.combine(data.date_from, time.min))
+            query = query.where(
+                field
+                >= (
+                    data.date_from
+                    if model in (PersonalEntry, FinanceEntry)
+                    else datetime.combine(data.date_from, time.min)
+                )
+            )
         if data.date_to:
-            query = query.where(field <= datetime.combine(data.date_to, time.max))
+            query = query.where(
+                field
+                <= (
+                    data.date_to
+                    if model in (PersonalEntry, FinanceEntry)
+                    else datetime.combine(data.date_to, time.max)
+                )
+            )
         rows = db.scalars(query.order_by(field.desc()).limit(50001)).all()
         if len(rows) > 50000:
             raise HTTPException(
@@ -219,6 +255,8 @@ def create_report(
         df = pd.DataFrame(
             [{c: getattr(r, c) for c in columns} for r in rows], columns=columns
         )
+    if data.dataset == "finance":
+        df["amount_brl"] = df.pop("amount_cents") / 100
     content = export_bytes(data, df, summary, groups)
     name = uuid4().hex + "." + data.format
     path = storage_path(name)
