@@ -31,7 +31,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Título", { exact: true }).fill("Entrega de teste");
   await dialog
-    .getByLabel("Projeto", { exact: true })
+    .getByRole("combobox", { name: "Projeto", exact: true })
     .selectOption({ label: "Projeto de teste" });
   await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(
@@ -57,13 +57,11 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     .getByRole("button", { name: "Importar planilha", exact: true })
     .click();
   dialog = page.getByRole("dialog");
-  await dialog
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "vendas.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from("categoria;valor\nA;10\nA;20\nB;30\n"),
-    });
+  await dialog.locator("input[type=file]").setInputFiles({
+    name: "vendas.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("categoria;valor\nA;10\nA;20\nB;30\n"),
+  });
   await dialog.getByRole("button", { name: "Importar", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "vendas.csv", exact: true }),
