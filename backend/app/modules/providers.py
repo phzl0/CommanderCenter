@@ -58,7 +58,8 @@ def get_bytes(url):
                 if (
                     parsed.scheme != "https"
                     or parsed.hostname not in ALLOWED_HOSTS
-                    or parsed.username
+                    or parsed.username is not None
+                    or parsed.port not in (None, 443)
                 ):
                     raise ProviderError("Endereço da fonte não permitido.")
                 with client.stream("GET", url) as response:

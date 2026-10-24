@@ -1,210 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import {
   LayoutDashboard,
-  FolderKanban,
   ListTodo,
-  Activity as ActivityIcon,
   FileSpreadsheet,
   Files,
   LogOut,
   Command,
   ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   Menu,
   ChevronRight,
   ShieldCheck,
 } from "lucide-react";
-import {
-  api,
-  send,
-  dateLabel,
-  timeLabel,
-  type User,
-  type Task,
-  type Activity,
-} from "./api";
+import { api, send, type User } from "./api";
 import { Management } from "./Management";
 import { DataLab } from "./DataLab";
 import { Reports } from "./Reports";
-type Tab =
-  "dashboard" | "projects" | "tasks" | "activities" | "imports" | "reports";
+const Intelligence = lazy(() => import("./Intelligence"));
+type Tab = "dashboard" | "tasks" | "imports" | "reports";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
-  { id: "projects", label: "Projetos", icon: FolderKanban },
   { id: "tasks", label: "Tarefas", icon: ListTodo },
-  { id: "activities", label: "Atividades", icon: ActivityIcon },
   { id: "imports", label: "Dados e análises", icon: FileSpreadsheet },
   { id: "reports", label: "Relatórios", icon: Files },
 ] as const;
-function Dashboard({ go, user }: { go: (t: Tab) => void; user: User }) {
-  const [data, setData] = useState<{
-      counts: Record<string, number>;
-      upcoming_tasks: Task[];
-      recent_activities: Activity[];
-    } | null>(null),
-    [error, setError] = useState("");
-  useEffect(() => {
-    api<typeof data>("/dashboard")
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, []);
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">SEU CENTRO DE OPERAÇÕES</span>
-          <h1>
-            Visão geral<span className="title-dot">.</span>
-          </h1>
-          <p>
-            Olá, {user.name.split(" ")[0]}. Transforme informação em próximas
-            ações.
-          </p>
-        </div>
-        <span className="date-chip">
-          {new Date().toLocaleDateString("pt-BR", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </span>
-      </div>
-      {error && (
-        <div className="error" role="alert">
-          {error}
-        </div>
-      )}
-      <div className="stats">
-        {[
-          {
-            key: "active_projects",
-            title: "Projetos ativos",
-            icon: FolderKanban,
-            color: "blue",
-            tab: "projects",
-          },
-          {
-            key: "pending_tasks",
-            title: "Tarefas em aberto",
-            icon: Clock,
-            color: "purple",
-            tab: "tasks",
-          },
-          {
-            key: "overdue_tasks",
-            title: "Tarefas atrasadas",
-            icon: AlertCircle,
-            color: "orange",
-            tab: "tasks",
-          },
-          {
-            key: "completed_tasks",
-            title: "Tarefas concluídas",
-            icon: CheckCircle2,
-            color: "green",
-            tab: "tasks",
-          },
-        ].map((c) => (
-          <button
-            className="stat panel"
-            key={c.key}
-            onClick={() => go(c.tab as Tab)}
-          >
-            <div>
-              <span className={"stat-icon " + c.color}>
-                <c.icon size={19} />
-              </span>
-              <ArrowUpRight size={16} />
-            </div>
-            <strong>{data ? data.counts[c.key] : "—"}</strong>
-            <span>{c.title}</span>
-          </button>
-        ))}
-      </div>
-      <div className="dashboard-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Próximas entregas</h2>
-              <p>Suas tarefas em aberto, por prazo</p>
-            </div>
-            <button className="quiet" onClick={() => go("tasks")}>
-              Ver todas <ChevronRight size={16} />
-            </button>
-          </div>
-          {!data ? (
-            <div className="empty">Carregando…</div>
-          ) : data.upcoming_tasks.length === 0 ? (
-            <div className="empty">
-              <ListTodo size={30} />
-              <h3>Espaço para sua próxima entrega</h3>
-              <p>Adicione tarefas para acompanhar os prazos por aqui.</p>
-              <button onClick={() => go("tasks")}>Organizar tarefas</button>
-            </div>
-          ) : (
-            data.upcoming_tasks.map((t) => (
-              <div className="upcoming" key={t.id}>
-                <span className={"priority-dot " + t.priority} />
-                <div>
-                  <h3>{t.title}</h3>
-                  <p>{dateLabel(t.due_date)}</p>
-                </div>
-                <span className={"badge " + t.status}>
-                  {t.status === "in_progress" ? "Em andamento" : "Pendente"}
-                </span>
-              </div>
-            ))
-          )}
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Atividade recente</h2>
-              <p>Um histórico das suas ações</p>
-            </div>
-            <ActivityIcon size={18} />
-          </div>
-          {!data ? (
-            <div className="empty">Carregando…</div>
-          ) : data.recent_activities.length === 0 ? (
-            <div className="empty">
-              <ActivityIcon size={30} />
-              <h3>Seu histórico começa aqui</h3>
-              <p>Registre uma atividade ou conclua uma tarefa.</p>
-            </div>
-          ) : (
-            <div className="timeline">
-              {data.recent_activities.map((a) => (
-                <article key={a.id}>
-                  <i />
-                  <div>
-                    <p>{a.description}</p>
-                    <span>{timeLabel(a.occurred_at)}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-      <section className="insight-banner">
-        <div className="banner-icon">
-          <FileSpreadsheet size={28} />
-        </div>
-        <div>
-          <span className="eyebrow">DOS DADOS À DECISÃO</span>
-          <h2>Suas planilhas, com uma nova perspectiva.</h2>
-          <p>Importe, filtre e analise seus dados. Exporte o que importa.</p>
-        </div>
-        <button onClick={() => go("imports")}>
-          Explorar dados <ArrowUpRight size={17} />
-        </button>
-      </section>
-    </>
-  );
-}
 export default function App() {
   const [user, setUser] = useState<User | null>(null),
     [checking, setChecking] = useState(true),
@@ -272,14 +90,14 @@ export default function App() {
             command<span className="brand-light">center</span>
           </div>
           <div>
-            <span className="eyebrow">CLAREZA PARA AVANÇAR</span>
+            <span className="eyebrow">SEU CENTRO DE INTELIGÊNCIA</span>
             <h1>
-              Todo o seu trabalho.
+              Informação conectada.
               <br />
-              Uma visão mais clara.
+              Decisões mais claras.
             </h1>
             <p>
-              Projetos, prioridades e dados conectados
+              Mercado, rotina e dados conectados
               <br />
               no seu centro de operações pessoal.
             </p>
@@ -345,7 +163,7 @@ export default function App() {
           </span>
           command<span className="brand-light">center</span>
         </div>
-        <span className="nav-label">WORKSPACE</span>
+        <span className="nav-label">CENTRO DE INFORMAÇÕES</span>
         <nav aria-label="Navegação principal">
           {nav.map((n) => (
             <button
@@ -403,7 +221,7 @@ export default function App() {
             >
               <Menu size={22} />
             </button>
-            <span>Workspace</span>
+            <span>Meu centro</span>
             <ChevronRight size={14} />
             <strong>{nav.find((n) => n.id === tab)?.label}</strong>
           </div>
@@ -418,7 +236,15 @@ export default function App() {
             </div>
           )}
           {tab === "dashboard" ? (
-            <Dashboard go={go} user={user} />
+            <Suspense
+              fallback={
+                <div className="empty">
+                  Carregando seu centro de informações…
+                </div>
+              }
+            >
+              <Intelligence user={user} />
+            </Suspense>
           ) : tab === "imports" ? (
             <DataLab />
           ) : tab === "reports" ? (
@@ -429,7 +255,7 @@ export default function App() {
         </main>
         <footer>
           Command Center <span>Seu próximo passo começa com clareza.</span>
-          <small>MVP 1</small>
+          <small>INTELLIGENCE WORKSPACE</small>
         </footer>
       </div>
     </div>

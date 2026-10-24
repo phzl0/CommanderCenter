@@ -82,9 +82,9 @@ export function Reports() {
     }
   }
   const labels: Record<string, string> = {
-    projects: "Projetos",
     tasks: "Tarefas",
-    activities: "Atividades",
+    personal: "Atividades pessoais",
+    finance: "Finanças pessoais",
     analysis: "Análise de planilha",
   };
   return (
@@ -241,10 +241,12 @@ export function Reports() {
                 <>
                   <p className="muted">
                     Período pela data de{" "}
-                    {dataset === "activities"
-                      ? "realização da atividade"
+                    {["activities", "personal", "finance"].includes(dataset)
+                      ? dataset === "finance"
+                        ? "lançamento"
+                        : "realização da atividade"
                       : "criação do registro"}{" "}
-                    (UTC). Deixe vazio para incluir tudo.
+                    (UTC para tarefas). Deixe vazio para incluir tudo.
                   </p>
                   <div className="form-grid">
                     <label>

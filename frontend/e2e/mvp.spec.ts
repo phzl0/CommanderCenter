@@ -4,6 +4,41 @@ test("private workspace: management, spreadsheet analysis and export", async ({
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // External panels use explicit test fixtures; no reliance on public quotas or live prices.
+  const externalIds = new Map<string, string>();
+  await page.route("**/api/intelligence/bootstrap", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    for (const w of body.widgets || []) externalIds.set(w.id, w.kind);
+    await route.fulfill({ response, json: body });
+  });
+  await page.route("**/api/intelligence/widgets/*/data?*", async (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[4];
+    const kind = externalIds.get(id);
+    if (kind === "news" || kind === "macro") {
+      await route.fulfill({
+        json: {
+          status: "ok",
+          source: "Fixture de teste automatizado",
+          message:
+            "Dados sintéticos exclusivos do teste; não são cotações ou notícias reais.",
+          as_of: new Date().toISOString(),
+          chart: {
+            points: [
+              { label: "2026-10-22", value: 3 },
+              { label: "2026-10-23", value: 5 },
+              { label: "2026-10-24", value: 4 },
+            ],
+            series: [
+              { key: "value", name: "Série de teste", color: "#5b9dff" },
+            ],
+            unit: "",
+          },
+          kpis: [{ label: "Amostra de teste", value: 4 }],
+        },
+      });
+    } else await route.continue();
+  });
   await page.goto("/");
   await page.getByLabel("E-mail", { exact: true }).fill("e2e@example.test");
   await page
@@ -18,14 +53,18 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     page.getByRole("heading", { name: "Visão geral." }),
   ).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Navegação principal" });
-  await nav.getByRole("button", { name: "Projetos", exact: true }).click();
-  await page.getByRole("button", { name: "Novo projeto", exact: true }).click();
-  let dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Nome", { exact: true }).fill("Projeto de teste");
-  await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Projeto de teste", exact: true }),
-  ).toBeVisible();
+    nav.getByRole("button", { name: "Projetos", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    nav.getByRole("button", { name: "Atividades", exact: true }),
+  ).toHaveCount(0);
+  const project = await page.request.post("/api/projects", {
+    headers: { origin: "http://localhost:5173" },
+    data: { name: "Projeto de teste" },
+  });
+  expect(project.ok()).toBeTruthy();
+  let dialog = page.getByRole("dialog");
   await nav.getByRole("button", { name: "Tarefas", exact: true }).click();
   await page.getByRole("button", { name: "Nova tarefa", exact: true }).click();
   dialog = page.getByRole("dialog");
@@ -43,13 +82,13 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(
     page.getByRole("button", { name: "Reabrir tarefa", exact: true }),
   ).toBeVisible();
-  await nav.getByRole("button", { name: "Atividades", exact: true }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Tarefa concluída: Entrega de teste",
-      exact: true,
-    }),
-  ).toBeVisible();
+  const history = await page.request.get("/api/activities");
+  expect(
+    (await history.json()).items.some(
+      (a: { description: string }) =>
+        a.description === "Tarefa concluída: Entrega de teste",
+    ),
+  ).toBeTruthy();
   await nav
     .getByRole("button", { name: "Dados e análises", exact: true })
     .click();
@@ -93,25 +132,110 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     page.getByRole("heading", { name: /Análise de vendas.csv/ }),
   ).toBeVisible();
   await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
+
+  await page
+    .locator(".dashboard-actions")
+    .getByRole("button", { name: "Registrar dados", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Atividade", { exact: true })
+    .fill("Estudo de programação");
+  await dialog.getByLabel("Tempo em minutos", { exact: true }).fill("60");
+  await dialog
+    .getByRole("button", { name: "Salvar registro", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toBeVisible();
+  await dialog.getByRole("button", { name: "Financeiro", exact: true }).click();
+  await dialog
+    .getByLabel("Descrição", { exact: true })
+    .fill("Receita de teste");
+  await dialog
+    .getByRole("combobox", { name: "Tipo financeiro", exact: true })
+    .selectOption("income");
+  await dialog.getByLabel("Valor em reais", { exact: true }).fill("1000");
+  await dialog.getByLabel("Categoria", { exact: true }).fill("Trabalho");
+  await dialog
+    .getByRole("button", { name: "Salvar registro", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Fechar registros", exact: true })
+    .click();
+  const personal = page.getByRole("region", {
+    name: "Minha atividade pessoal",
+    exact: true,
+  });
+  await expect(
+    personal.getByRole("img", { name: /Gráfico com/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", {
+      name: "Ocultar Desenvolvimento no GitHub",
+      exact: true,
+    })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Subir Minha atividade pessoal", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Fechar personalização", exact: true })
+    .click();
+  await page.reload();
+  await expect(
+    page.getByRole("region", {
+      name: "Desenvolvimento no GitHub",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .locator(".intelligence-card")
+      .first()
+      .getByRole("heading", { name: "Minha atividade pessoal", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Gráfico de planilha/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Título do painel", { exact: true })
+    .fill("Minha planilha");
+  await dialog
+    .getByRole("combobox", { name: "Análise salva", exact: true })
+    .selectOption({ label: "Análise de vendas.csv" });
+  await dialog
+    .getByRole("combobox", { name: "Eixo horizontal", exact: true })
+    .selectOption("categoria");
+  await dialog
+    .getByRole("combobox", { name: "Coluna de valores", exact: true })
+    .selectOption("valor");
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: "Minha planilha", exact: true })
+      .getByRole("img", { name: /Gráfico com/ }),
+  ).toBeVisible();
+  await expect(page.locator(".chart-loading")).toHaveCount(0);
   await page.screenshot({
     path: "test-results/dashboard-desktop.png",
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(
-    page.getByRole("button", { name: "Abrir menu", exact: true }),
-  ).toBeVisible();
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
-  await nav.getByRole("button", { name: "Projetos", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Projetos", exact: true }),
-  ).toBeVisible();
+  await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
   await expect(nav).not.toBeInViewport();
   await expect(
-    page.getByRole("heading", { name: "Projeto de teste", exact: true }),
+    page.getByRole("button", { name: "Personalizar", exact: true }),
   ).toBeVisible();
   await page.screenshot({
-    path: "test-results/projects-mobile.png",
+    path: "test-results/dashboard-mobile.png",
     fullPage: true,
   });
   expect(errors).toEqual([]);

@@ -134,3 +134,7 @@ Deploy, integrações, notícias, LangGraph e automações ficam para etapas fut
 ### Teste por navegador
 
 O job `compose-e2e` constrói e inicia os três serviços em um runner descartável, executa Playwright em Chromium e verifica persistência após reinício. Capturas desktop/celular e rastros de falha são guardados por sete dias nos artefatos do run. A conta de teste é criada somente no banco descartável com sufixo `_test`; ela não existe na instalação pessoal.
+
+## Visão geral configurável (0.2)
+
+Novo tema escuro azul, gráficos de área/linha/barras e painéis escolhidos por usuário. Projetos e Atividades saíram do menu; os dados existentes são mantidos. Inclui registro rápido pessoal/financeiro, painéis de tarefas, GitHub público, notícias, BCB, ações via chave opcional e análises salvas. Consulte [o guia do centro de informações](docs/intelligence-workspace.md) para fontes, limitações e atualização sem perder seus dados.
