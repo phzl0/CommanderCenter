@@ -4,11 +4,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.config import settings
-from app.modules import auth, management
+from app.modules import auth, management, files, reports
 
 app = FastAPI(title="Command Center", version="0.1.0")
 app.include_router(auth.router)
 app.include_router(management.router)
+app.include_router(files.router)
+app.include_router(reports.router)
 
 @app.middleware("http")
 async def browser_security(request: Request, call_next):
