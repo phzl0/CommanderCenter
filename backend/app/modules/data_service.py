@@ -2,6 +2,7 @@
 import csv
 import io
 import json
+import math
 import zipfile
 from pathlib import Path
 from typing import Literal
@@ -44,6 +45,8 @@ def load_frame(source, suffix, options=None, sheet=None):
             if not separator:
                 try: separator=csv.Sniffer().sniff(decoded[:8192],delimiters=',;\t|').delimiter
                 except csv.Error: separator=','
+            header=next(csv.reader(io.StringIO(decoded),delimiter=separator),[])
+            if len(header)>settings.max_columns: raise HTTPException(422,'O arquivo excede o limite de colunas.')
             df=pd.read_csv(io.StringIO(decoded),sep=separator,decimal=options.get('decimal','.'),nrows=settings.max_rows+1)
         else:
             raw=source if isinstance(source,bytes) else Path(source).read_bytes()
@@ -55,6 +58,11 @@ def load_frame(source, suffix, options=None, sheet=None):
                 sheets=workbook.sheet_names
                 chosen=sheet or options.get('sheet') or sheets[0]
                 if chosen not in sheets: raise HTTPException(422,'Aba não encontrada no Excel.')
+                if suffix=='.xlsx':
+                    width=workbook.book[chosen].max_column
+                else:
+                    width=workbook.book.sheet_by_name(chosen).ncols
+                if width and width>settings.max_columns: raise HTTPException(422,'A aba excede o limite de colunas.')
                 df=pd.read_excel(workbook,sheet_name=chosen,nrows=settings.max_rows+1)
         if len(df)>settings.max_rows or len(df.columns)>settings.max_columns:
             raise HTTPException(422,f'Limite: {settings.max_rows} linhas e {settings.max_columns} colunas por aba.')
@@ -96,7 +104,9 @@ def analyze(df,config: AnalysisConfig):
         else:
             value=f.value
             if pd.api.types.is_numeric_dtype(s):
-                try: value=float(value)
+                try:
+                    value=float(value)
+                    if not math.isfinite(value): raise ValueError()
                 except ValueError: raise HTTPException(422,'Informe um número válido para o filtro (decimal com ponto).')
             elif f.operator in ('gt','gte','lt','lte'): numeric(s)
             if f.operator=='eq': mask=s==value
@@ -110,7 +120,7 @@ def analyze(df,config: AnalysisConfig):
     for a in config.aggregations:
         if a.operation!='count': numeric(filtered[a.column])
         value=getattr(filtered[a.column],a.operation)()
-        summary.append({'column':a.column,'operation':a.operation,'value':None if pd.isna(value) else float(value) if a.operation!='count' else int(value)})
+        summary.append({'column':a.column,'operation':a.operation,'value':None if pd.isna(value) or not math.isfinite(float(value)) else float(value) if a.operation!='count' else int(value)})
     groups=[]
     if config.group_by and config.aggregations:
         grouped=filtered.groupby(config.group_by,dropna=False,sort=False)

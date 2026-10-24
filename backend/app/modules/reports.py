@@ -1,4 +1,8 @@
 import io
+from pathlib import Path
+import reportlab
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from datetime import date, datetime, time
 from typing import Literal
 from uuid import uuid4
@@ -51,13 +55,21 @@ def safe_frame(df):
 
 def pdf_bytes(title,df,summary,groups):
     out=io.BytesIO();styles=getSampleStyleSheet()
-    body=ParagraphStyle('cell',parent=styles['Normal'],fontSize=7,leading=9,wordWrap='CJK')
+    fonts=Path(reportlab.__file__).parent/'fonts'
+    if 'CCSans' not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont('CCSans',str(fonts/'Vera.ttf')))
+        pdfmetrics.registerFont(TTFont('CCSansBold',str(fonts/'VeraBd.ttf')))
+    styles['Normal'].fontName='CCSans'
+    styles['Title'].fontName='CCSansBold'
+    styles['Title'].fontSize=20
+    body=ParagraphStyle('cell',parent=styles['Normal'],fontSize=8,leading=11,wordWrap='CJK')
     def para(value,style=body):
         text=str(value) if value is not None else ''
         return Paragraph(escape(text[:1000]).replace('\n','<br/>'),style)
     story=[para(title,styles['Title']),para(f'Command Center · {len(df)} registros · Gerado em {datetime.now().strftime("%d/%m/%Y %H:%M")} UTC'),Spacer(1,12)]
     for a in summary:
-        story.append(para(f'{a["operation"]}({a["column"]}): {a["value"]}'))
+        label={'sum':'Soma','mean':'Média','count':'Contagem'}[a['operation']]
+        story.append(para(f'{label} - {a["column"]}: {a["value"]}'))
     export_df=pd.DataFrame(groups) if groups else df
     # PDF is a readable summary; CSV/XLSX retain all rows and columns.
     shown=export_df.iloc[:200,:8]
@@ -67,7 +79,11 @@ def pdf_bytes(title,df,summary,groups):
         table=Table(data,repeatRows=1,colWidths=[(landscape(A4)[0]-64)/len(shown.columns)]*len(shown.columns),hAlign='LEFT')
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#dbeafe')),('VALIGN',(0,0),(-1,-1),'TOP'),('GRID',(0,0),(-1,-1),.3,colors.HexColor('#d1d5db')),('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#f8fafc')]),('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),5)]))
         story.append(table)
-    SimpleDocTemplate(out,pagesize=landscape(A4),leftMargin=32,rightMargin=32,topMargin=32,bottomMargin=32).build(story)
+    def footer(canvas,doc):
+        canvas.saveState();canvas.setFont('CCSans',8);canvas.setFillColor(colors.HexColor('#8793a3'))
+        canvas.drawString(32,18,'Command Center - Relatório privado')
+        canvas.drawRightString(landscape(A4)[0]-32,18,f'Página {doc.page}');canvas.restoreState()
+    SimpleDocTemplate(out,pagesize=landscape(A4),leftMargin=32,rightMargin=32,topMargin=32,bottomMargin=36).build(story,onFirstPage=footer,onLaterPages=footer)
     return out.getvalue()
 
 def export_bytes(data,df,summary,groups):

@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 from app.core.db import get_db
 from app.core.config import settings
 from app.modules import auth, management, files, reports
@@ -29,3 +30,7 @@ async def browser_security(request: Request, call_next):
 def health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"status":"ok", "database":"ok"}
+
+@app.exception_handler(OperationalError)
+async def database_unavailable(request: Request, exc: OperationalError):
+    return JSONResponse({"detail":"Banco indisponível. Confira se o PostgreSQL está em execução."}, status_code=503)

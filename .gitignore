@@ -10,3 +10,4 @@ dist/
 *.db
 storage/
 .coverage
+*.tsbuildinfo
