@@ -384,6 +384,7 @@ export function Management({ section }: { section: Section }) {
                 <label>
                   Projeto
                   <select
+                    aria-label="Projeto"
                     name="project_id"
                     defaultValue={row?.project_id || ""}
                   >
@@ -400,7 +401,11 @@ export function Management({ section }: { section: Section }) {
                 <>
                   <label>
                     Tarefa relacionada
-                    <select name="task_id" defaultValue={row?.task_id || ""}>
+                    <select
+                      aria-label="Tarefa relacionada"
+                      name="task_id"
+                      defaultValue={row?.task_id || ""}
+                    >
                       <option value="">Sem tarefa</option>
                       {tasks.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -434,6 +439,7 @@ export function Management({ section }: { section: Section }) {
                     <label>
                       Situação
                       <select
+                        aria-label="Situação"
                         name="status"
                         defaultValue={
                           row?.status ||
@@ -463,6 +469,7 @@ export function Management({ section }: { section: Section }) {
                     <label>
                       Prioridade
                       <select
+                        aria-label="Prioridade"
                         name="priority"
                         defaultValue={row?.priority || "medium"}
                       >
