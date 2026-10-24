@@ -403,3 +403,11 @@ def test_management_report_date_filters_and_formula_escape(client):
         io.BytesIO(client.get("/api/reports/" + r.json()["id"] + "/download").content)
     )
     assert frame.empty and "name" in frame.columns
+
+
+def test_pdf_long_cells_fit_pages():
+    frame = pd.DataFrame(
+        {f"Coluna {n}": ["texto longo " * 1000, "\n" * 1000] for n in range(8)}
+    )
+    content = pdf_bytes("Relatório com textos extensos", frame, [], [])
+    assert content.startswith(b"%PDF")

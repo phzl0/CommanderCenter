@@ -75,8 +75,9 @@ def pdf_bytes(title, df, summary, groups):
     )
 
     def para(value, style=body):
-        text = str(value) if value is not None else ""
-        return Paragraph(escape(text[:1000]).replace("\n", "<br/>"), style)
+        text = " ".join(str(value).split()) if value is not None else ""
+        text = text[:160] + "..." if len(text) > 160 else text
+        return Paragraph(escape(text), style)
 
     story = [
         para(title, styles["Title"]),
@@ -95,7 +96,7 @@ def pdf_bytes(title, df, summary, groups):
         [
             Spacer(1, 12),
             para(
-                f"Prévia: {len(shown)} de {len(export_df)} linhas; {len(shown.columns)} de {len(export_df.columns)} colunas. Use CSV/Excel para os dados completos."
+                f"Prévia: {len(shown)} de {len(export_df)} linhas; {len(shown.columns)} de {len(export_df.columns)} colunas. Textos longos abreviados. Use CSV/Excel para os dados completos."
             ),
             Spacer(1, 8),
         ]
