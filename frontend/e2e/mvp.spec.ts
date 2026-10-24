@@ -106,6 +106,10 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(
     page.getByRole("heading", { name: "Projetos", exact: true }),
   ).toBeVisible();
+  await expect(nav).not.toBeInViewport();
+  await expect(
+    page.getByRole("heading", { name: "Projeto de teste", exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: "test-results/projects-mobile.png",
     fullPage: true,

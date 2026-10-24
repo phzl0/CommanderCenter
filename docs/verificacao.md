@@ -1,27 +1,40 @@
 # Verificação do MVP 1
 
-## Executado neste ambiente
+## Resultados confirmados
 
-- Build React/TypeScript com `npm run build`: aprovado.
-- 13 testes de API/integração com bancos SQLite temporários e chaves estrangeiras habilitadas: aprovados.
-- Testes também aprovados no PostgreSQL 17 pelo run https://github.com/phzl0/CommanderCenter/actions/runs/40125218446.
-- Fluxo HTTP com frontend local, proxy, API, banco, sessão e logout: aprovado.
-- Migração Alembic inicial aplicada nos bancos de teste; geração do SQL para PostgreSQL aprovada.
-- PDF gerado por um teste real e renderizado com Poppler para revisão visual.
+- Build React/TypeScript com `npm run build`: aprovado localmente e no GitHub Actions.
+- 14 testes de API/integração: aprovados localmente em SQLite temporário com chaves estrangeiras habilitadas e no PostgreSQL 17 do GitHub Actions.
+- Migração Alembic aplicada em PostgreSQL real; geração de SQL offline também aprovada.
+- Fluxo HTTP local com frontend, proxy, API, banco, sessão e logout: aprovado.
+- PDF gerado, renderizado com Poppler e revisado visualmente. Teste adicional protege a geração contra células muito extensas.
+- Docker Compose: imagens de frontend/backend construídas, banco inicializado, migrações aplicadas e serviços iniciados com sucesso em um runner descartável.
+- Teste por navegador: login, sessão após atualizar a página, projeto, tarefa vinculada, conclusão e histórico automático, importação CSV, soma de valores, análise salva, exportação Excel e listagem do relatório: aprovados.
+- Navegação móvel: menu e acesso a projetos verificados com viewport de 390 × 844.
+- Reinício dos três containers: registro do projeto e arquivo original preservados nos volumes.
 
-## Cobertura da suíte
+Execuções que comprovam a validação:
 
-Autenticação, sessão revogada no logout, conta desativada, limite de tentativas, bloqueio de origens não autorizadas, rejeição de campos de proprietário enviados pelo cliente, isolamento entre usuários em consultas/edições/downloads, paginação/busca, conclusão de tarefas sem evento duplicado, reabertura, relações de atividade, CSV com codificação/decimal, múltiplas abas Excel, filtros/agregações/agrupamentos, análise salva/reexecutada, arquivos inválidos/limites, exportações CSV/XLSX/PDF e exclusão de arquivos relacionados.
+- https://github.com/phzl0/CommanderCenter/actions/runs/40125218446 — suíte inicial PostgreSQL e build.
+- https://github.com/phzl0/CommanderCenter/actions/runs/40125780610 — API/PostgreSQL, build, Docker, navegador e persistência.
+- https://github.com/phzl0/CommanderCenter/actions/runs/40125841710 — repetição após ajuste do seletor do teste, com o mesmo fluxo completo.
 
-## Validação adicional
+As capturas de desktop e celular ficam nos artefatos `e2e-results` dos runs, com retenção de sete dias. A suíte usa uma conta e dados descartáveis; eles não são criados no ambiente pessoal ao iniciar o aplicativo.
 
-O workflow `.github/workflows/ci.yml` executa a suíte contra PostgreSQL 17 e recompila o frontend. O resultado é registrado na aba Actions de cada commit. A existência do workflow, por si só, não comprova sua execução; consulte a conclusão do run.
+## Cobertura da suíte de API
 
-## Pendente no Ubuntu
+Autenticação, sessão revogada no logout, conta desativada, limite de tentativas, bloqueio de origens não autorizadas, rejeição de campos de proprietário enviados pelo cliente, isolamento entre usuários em consultas/edições/downloads, paginação/busca, conclusão de tarefas sem evento duplicado, reabertura, relações de atividade, CSV com codificação/decimal, múltiplas abas Excel, filtros/agregações/agrupamentos, análise salva/reexecutada, arquivos inválidos/limites, exportações CSV/XLSX/PDF, proteção de fórmulas nas exportações e exclusão de arquivos relacionados.
 
-O ambiente de implementação não tem Docker. A execução dos três containers, a persistência dos volumes após reinício e a restauração de backups precisam ser verificadas no Ubuntu com Docker.
+## Ajustes identificados durante a verificação
 
-O navegador de inspeção está em outro ambiente e não alcançou o servidor local. Por isso, navegação visual, responsividade e interações completas por cliques ainda precisam ser avaliadas com o usuário, apesar do build e dos testes de API aprovados.
+- Campos de seleção receberam nomes acessíveis explícitos; o teste passou a selecionar o relacionamento pelo papel `combobox`.
+- Células longas são abreviadas no PDF para não ultrapassarem a altura de uma página. CSV/Excel mantêm os dados dentro dos limites de seus formatos.
+- A inicialização aguarda o PostgreSQL antes de aplicar migrações, inclusive após reiniciar os containers.
+
+## Pendente no computador do usuário
+
+O ambiente de implementação não tem Docker; a validação Docker ocorreu em runner de testes. Ainda é necessário executar no Ubuntu do usuário e verificar sua versão do Docker, permissões locais, portas e desempenho com seus arquivos reais. O fluxo completo de backup/restauração está documentado, mas ainda não foi validado de ponta a ponta.
+
+A aprovação dos testes não substitui a revisão das telas e regras com o usuário. Não existe configuração de deploy nesta etapa.
 
 ## Roteiro de aceite local
 
@@ -30,10 +43,10 @@ O navegador de inspeção está em outro ambiente e não alcançou o servidor lo
 3. Criar um projeto, uma tarefa vinculada e uma atividade manual.
 4. Concluir a tarefa duas vezes via edição: deve existir somente um evento automático dessa conclusão.
 5. Conferir os contadores do dashboard.
-6. Importar CSV e Excel, testar abas e comparar soma/média com a planilha.
+6. Importar CSV e Excel próprios, testar abas e comparar soma/média com a planilha.
 7. Salvar análise, reabrir, gerar CSV, Excel e PDF e abrir os três arquivos.
 8. Criar segunda conta pelo CLI e confirmar que ela inicia sem os dados da primeira.
 9. Parar e subir os serviços, verificar registros e download do original.
 10. Testar backup/restauração em instalação vazia antes de depender dele.
 
-PDF é resumo com limite de linhas/colunas e texto de células limitado a 1.000 caracteres. CSV e Excel incluem os dados completos dentro dos limites do MVP. Não há validação de deploy nesta etapa.
+PDF é um resumo com até 200 linhas, 8 colunas e texto de células limitado a 160 caracteres. As listagens de arquivos/análises/relatórios e os seletores de relacionamento exibem até 1.000 registros; as listas principais de gestão têm paginação.

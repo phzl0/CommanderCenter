@@ -130,3 +130,7 @@ Veja [docs/verificacao.md](docs/verificacao.md), [docs/arquitetura.md](docs/arqu
 O volume `postgres_data` contém o banco e `private_storage` contém os arquivos. Código e migrações ficam no Git; dados e `.env` não. Commit não é backup dos seus dados. Consulte [docs/backup.md](docs/backup.md) para salvar e restaurar ambos.
 
 Deploy, integrações, notícias, LangGraph e automações ficam para etapas futuras. Esta configuração é destinada ao uso local; não foi preparada para exposição pública.
+
+### Teste por navegador
+
+O job `compose-e2e` constrói e inicia os três serviços em um runner descartável, executa Playwright em Chromium e verifica persistência após reinício. Capturas desktop/celular e rastros de falha são guardados por sete dias nos artefatos do run. A conta de teste é criada somente no banco descartável com sufixo `_test`; ela não existe na instalação pessoal.
