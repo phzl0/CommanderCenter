@@ -15,8 +15,10 @@ passwords = PasswordHash.recommended()
 DUMMY_HASH = passwords.hash("invalid-password-placeholder")
 COOKIE = "cc_session"
 
+
 def token_hash(token: str):
     return hashlib.sha256(token.encode()).hexdigest()
+
 
 def current_user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get(COOKIE, "")
@@ -28,25 +30,36 @@ def current_user(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(401, "Sessão inválida.")
     return user
 
+
 def create_session(db, user):
     db.execute(delete(SessionToken).where(SessionToken.expires_at <= now()))
     token = secrets.token_urlsafe(48)
-    db.add(SessionToken(token_hash=token_hash(token), user_id=user.id, expires_at=now()+timedelta(hours=settings.session_hours)))
+    db.add(
+        SessionToken(
+            token_hash=token_hash(token),
+            user_id=user.id,
+            expires_at=now() + timedelta(hours=settings.session_hours),
+        )
+    )
     db.commit()
     return token
 
+
 class LoginLimiter:
     """Single-process local MVP limiter; no proxy headers are trusted."""
+
     def __init__(self):
         self.attempts = {}
         self.lock = threading.Lock()
+
     def check(self, key):
         with self.lock:
             t = time.monotonic()
-            self.attempts = {k:v for k,v in self.attempts.items() if v[-1] > t-600}
-            values = [v for v in self.attempts.get(key, []) if v > t-600]
+            self.attempts = {k: v for k, v in self.attempts.items() if v[-1] > t - 600}
+            values = [v for v in self.attempts.get(key, []) if v > t - 600]
             if len(values) >= 10:
                 raise HTTPException(429, "Muitas tentativas. Aguarde 10 minutos.")
             self.attempts[key] = values + [t]
+
 
 limiter = LoginLimiter()

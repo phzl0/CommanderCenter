@@ -4,6 +4,8 @@
 
 - Build React/TypeScript com `npm run build`: aprovado.
 - 13 testes de API/integração com bancos SQLite temporários e chaves estrangeiras habilitadas: aprovados.
+- Testes também aprovados no PostgreSQL 17 pelo run https://github.com/phzl0/CommanderCenter/actions/runs/40125218446.
+- Fluxo HTTP com frontend local, proxy, API, banco, sessão e logout: aprovado.
 - Migração Alembic inicial aplicada nos bancos de teste; geração do SQL para PostgreSQL aprovada.
 - PDF gerado por um teste real e renderizado com Poppler para revisão visual.
 
