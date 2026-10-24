@@ -178,7 +178,7 @@ def github_data(repository, start, end):
 def macro_data(code, start, end):
     number, name, unit = SERIES[code]
     # IPCA is monthly: a wider window supplies meaningful points without manufacturing daily values.
-    beginning = start - timedelta(days=365) if code == "ipca" else start
+    beginning = end - timedelta(days=365) if code == "ipca" else start
     url = f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{number}/dados?formato=json&dataInicial={beginning:%d/%m/%Y}&dataFinal={end:%d/%m/%Y}"
     raw = get_json(url)
     if not isinstance(raw, list):

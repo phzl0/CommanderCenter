@@ -61,3 +61,5 @@ Consultas externas usam hosts HTTPS fixos, tempo limite, limite de resposta e tr
 ## Verificação desta etapa
 
 A suíte acrescenta testes de preferências, reordenação, isolamento, exclusão, limite de painéis, cache, falha de fontes, cálculos financeiros, edição de registros, referências de análises e exportações pessoais/financeiras. Provedores usam fixtures nos testes: a suíte não confirma que um serviço público está disponível em tempo real. O teste por navegador também identifica suas fixtures explicitamente e verifica o novo menu, registros, personalização persistente e gráfico de planilha, além das funções anteriores.
+
+Verificação adicional: a janela do IPCA permanece nos últimos 12 meses mesmo quando o usuário alterna o período dos demais painéis. A suíte local atual tem 23 testes aprovados.

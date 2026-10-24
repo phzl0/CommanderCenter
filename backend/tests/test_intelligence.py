@@ -309,3 +309,20 @@ def test_personal_finance_exports(client):
         assert ("amount_brl" if kind == "finance" else "minutes") in csv
         if kind == "finance":
             assert "42.15" in csv
+
+
+def test_ipca_keeps_twelve_month_window_independent_of_dashboard_period(monkeypatch):
+    from datetime import timedelta
+    from app.modules.intelligence import date_range
+
+    _, end = date_range(30)
+    urls = []
+
+    def response(url):
+        urls.append(url)
+        return []
+
+    monkeypatch.setattr(providers, "get_json", response)
+    providers.macro_data("ipca", end - timedelta(days=6), end)
+    providers.macro_data("ipca", end - timedelta(days=89), end)
+    assert urls[0] == urls[1]
