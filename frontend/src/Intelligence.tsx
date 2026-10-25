@@ -188,7 +188,7 @@ function WidgetCard({
                   ? "Conecte sua fonte"
                   : data?.status === "unavailable"
                     ? "Fonte indisponível"
-                    : "Seu próximo dado começa aqui"}
+                    : "Sem dados"}
               </h3>
               <p>
                 {data?.status === "empty"

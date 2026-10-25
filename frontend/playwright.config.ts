@@ -5,6 +5,7 @@ export default defineConfig({
   retries: 0,
   timeout: 60000,
   use: {
+    actionTimeout: 15000,
     baseURL: "http://localhost:5173",
     viewport: { width: 1440, height: 1000 },
     screenshot: "only-on-failure",

@@ -352,250 +352,258 @@ export function DataLab() {
               </p>
             )}
             <div className="analysis-config">
-              <div className="form-grid">
-                <label>
-                  Nome da análise
-                  <input
-                    value={name}
-                    maxLength={160}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      setDirty(true);
-                    }}
-                  />
-                </label>
-                {selected.sheets.length > 0 && (
+              <details className="analysis-options">
+                <summary>Filtros e cálculos</summary>
+                <div className="form-grid">
                   <label>
-                    Aba do Excel
-                    <select
-                      value={config.sheet || ""}
-                      disabled={busy}
-                      onChange={(e) => sheet(e.target.value)}
-                    >
-                      {selected.sheets.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </div>
-              <h3>
-                <SlidersHorizontal size={16} /> Colunas
-              </h3>
-              <div className="column-picker">
-                {columns.map((c) => (
-                  <label key={c.name}>
+                    Nome da análise
                     <input
-                      type="checkbox"
-                      checked={
-                        config.columns.length === 0 ||
-                        config.columns.includes(c.name)
-                      }
+                      value={name}
+                      maxLength={160}
                       onChange={(e) => {
-                        const current = config.columns.length
-                          ? config.columns
-                          : columns.map((c) => c.name);
-                        const next = e.target.checked
-                          ? [...current, c.name]
-                          : current.filter((n) => n !== c.name);
-                        if (next.length) change({ ...config, columns: next });
+                        setName(e.target.value);
+                        setDirty(true);
                       }}
                     />
-                    {c.name}
-                    <small>{c.numeric ? "123" : "ABC"}</small>
                   </label>
-                ))}
-              </div>
-              <div className="analysis-sections">
-                <section>
-                  <div className="mini-heading">
-                    <h3>Filtros</h3>
-                    <button
-                      disabled={
-                        config.filters.length >= 20 || columns.length === 0
-                      }
-                      onClick={() =>
-                        change({
-                          ...config,
-                          filters: [
-                            ...config.filters,
-                            {
-                              column: columns[0].name,
-                              operator: "eq",
-                              value: "",
-                            },
-                          ],
-                        })
-                      }
-                    >
-                      <Plus size={14} /> Adicionar
-                    </button>
-                  </div>
-                  {config.filters.length === 0 && (
-                    <p className="muted">
-                      Todos os registros serão considerados.
-                    </p>
+                  {selected.sheets.length > 0 && (
+                    <label>
+                      Aba do Excel
+                      <select
+                        value={config.sheet || ""}
+                        disabled={busy}
+                        onChange={(e) => sheet(e.target.value)}
+                      >
+                        {selected.sheets.map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </label>
                   )}
-                  {config.filters.map((f, i) => (
-                    <div className="filter-row" key={i}>
-                      <select
-                        aria-label="Coluna do filtro"
-                        value={f.column}
-                        onChange={(e) =>
+                </div>
+                <h3>
+                  <SlidersHorizontal size={16} /> Colunas
+                </h3>
+                <div className="column-picker">
+                  {columns.map((c) => (
+                    <label key={c.name}>
+                      <input
+                        type="checkbox"
+                        checked={
+                          config.columns.length === 0 ||
+                          config.columns.includes(c.name)
+                        }
+                        onChange={(e) => {
+                          const current = config.columns.length
+                            ? config.columns
+                            : columns.map((c) => c.name);
+                          const next = e.target.checked
+                            ? [...current, c.name]
+                            : current.filter((n) => n !== c.name);
+                          if (next.length) change({ ...config, columns: next });
+                        }}
+                      />
+                      {c.name}
+                      <small>{c.numeric ? "123" : "ABC"}</small>
+                    </label>
+                  ))}
+                </div>
+                <div className="analysis-sections">
+                  <section>
+                    <div className="mini-heading">
+                      <h3>Filtros</h3>
+                      <button
+                        disabled={
+                          config.filters.length >= 20 || columns.length === 0
+                        }
+                        onClick={() =>
                           change({
                             ...config,
-                            filters: config.filters.map((x, n) =>
-                              n === i ? { ...x, column: e.target.value } : x,
-                            ),
+                            filters: [
+                              ...config.filters,
+                              {
+                                column: columns[0].name,
+                                operator: "eq",
+                                value: "",
+                              },
+                            ],
                           })
                         }
                       >
-                        {columns.map((c) => (
-                          <option key={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                      <select
-                        aria-label="Operador"
-                        value={f.operator}
-                        onChange={(e) =>
-                          change({
-                            ...config,
-                            filters: config.filters.map((x, n) =>
-                              n === i ? { ...x, operator: e.target.value } : x,
-                            ),
-                          })
-                        }
-                      >
-                        {Object.entries(operators).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                      {!["is_empty", "not_empty"].includes(f.operator) && (
-                        <input
-                          aria-label="Valor do filtro"
-                          placeholder="Valor"
-                          value={f.value}
+                        <Plus size={14} /> Adicionar
+                      </button>
+                    </div>
+                    {config.filters.length === 0 && (
+                      <p className="muted">
+                        Todos os registros serão considerados.
+                      </p>
+                    )}
+                    {config.filters.map((f, i) => (
+                      <div className="filter-row" key={i}>
+                        <select
+                          aria-label="Coluna do filtro"
+                          value={f.column}
                           onChange={(e) =>
                             change({
                               ...config,
                               filters: config.filters.map((x, n) =>
-                                n === i ? { ...x, value: e.target.value } : x,
+                                n === i ? { ...x, column: e.target.value } : x,
                               ),
                             })
                           }
-                        />
-                      )}
+                        >
+                          {columns.map((c) => (
+                            <option key={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="Operador"
+                          value={f.operator}
+                          onChange={(e) =>
+                            change({
+                              ...config,
+                              filters: config.filters.map((x, n) =>
+                                n === i
+                                  ? { ...x, operator: e.target.value }
+                                  : x,
+                              ),
+                            })
+                          }
+                        >
+                          {Object.entries(operators).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                        {!["is_empty", "not_empty"].includes(f.operator) && (
+                          <input
+                            aria-label="Valor do filtro"
+                            placeholder="Valor"
+                            value={f.value}
+                            onChange={(e) =>
+                              change({
+                                ...config,
+                                filters: config.filters.map((x, n) =>
+                                  n === i ? { ...x, value: e.target.value } : x,
+                                ),
+                              })
+                            }
+                          />
+                        )}
+                        <button
+                          aria-label="Remover filtro"
+                          className="icon-button"
+                          onClick={() =>
+                            change({
+                              ...config,
+                              filters: config.filters.filter((_, n) => n !== i),
+                            })
+                          }
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                  <section>
+                    <div className="mini-heading">
+                      <h3>Cálculos</h3>
                       <button
-                        aria-label="Remover filtro"
-                        className="icon-button"
+                        disabled={
+                          config.aggregations.length >= 20 ||
+                          columns.length === 0
+                        }
                         onClick={() =>
                           change({
                             ...config,
-                            filters: config.filters.filter((_, n) => n !== i),
+                            aggregations: [
+                              ...config.aggregations,
+                              { column: columns[0].name, operation: "count" },
+                            ],
                           })
                         }
                       >
-                        <X size={16} />
+                        <Plus size={14} /> Adicionar
                       </button>
                     </div>
-                  ))}
-                </section>
-                <section>
-                  <div className="mini-heading">
-                    <h3>Cálculos</h3>
-                    <button
-                      disabled={
-                        config.aggregations.length >= 20 || columns.length === 0
-                      }
-                      onClick={() =>
-                        change({
-                          ...config,
-                          aggregations: [
-                            ...config.aggregations,
-                            { column: columns[0].name, operation: "count" },
-                          ],
-                        })
-                      }
-                    >
-                      <Plus size={14} /> Adicionar
-                    </button>
-                  </div>
-                  {config.aggregations.length === 0 && (
-                    <p className="muted">Adicione soma, média ou contagem.</p>
-                  )}
-                  {config.aggregations.map((a, i) => (
-                    <div className="filter-row" key={i}>
+                    {config.aggregations.length === 0 && (
+                      <p className="muted">Adicione soma, média ou contagem.</p>
+                    )}
+                    {config.aggregations.map((a, i) => (
+                      <div className="filter-row" key={i}>
+                        <select
+                          aria-label="Coluna do cálculo"
+                          value={a.column}
+                          onChange={(e) =>
+                            change({
+                              ...config,
+                              aggregations: config.aggregations.map((x, n) =>
+                                n === i ? { ...x, column: e.target.value } : x,
+                              ),
+                            })
+                          }
+                        >
+                          {columns.map((c) => (
+                            <option key={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="Cálculo"
+                          value={a.operation}
+                          onChange={(e) =>
+                            change({
+                              ...config,
+                              aggregations: config.aggregations.map((x, n) =>
+                                n === i
+                                  ? { ...x, operation: e.target.value }
+                                  : x,
+                              ),
+                            })
+                          }
+                        >
+                          {Object.entries(operations).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="icon-button"
+                          aria-label="Remover cálculo"
+                          onClick={() =>
+                            change({
+                              ...config,
+                              aggregations: config.aggregations.filter(
+                                (_, n) => n !== i,
+                              ),
+                            })
+                          }
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    <label>
+                      Agrupar cálculos por
                       <select
-                        aria-label="Coluna do cálculo"
-                        value={a.column}
+                        value={config.group_by[0] || ""}
                         onChange={(e) =>
                           change({
                             ...config,
-                            aggregations: config.aggregations.map((x, n) =>
-                              n === i ? { ...x, column: e.target.value } : x,
-                            ),
+                            group_by: e.target.value ? [e.target.value] : [],
                           })
                         }
                       >
+                        <option value="">Sem agrupamento</option>
                         {columns.map((c) => (
                           <option key={c.name}>{c.name}</option>
                         ))}
                       </select>
-                      <select
-                        aria-label="Cálculo"
-                        value={a.operation}
-                        onChange={(e) =>
-                          change({
-                            ...config,
-                            aggregations: config.aggregations.map((x, n) =>
-                              n === i ? { ...x, operation: e.target.value } : x,
-                            ),
-                          })
-                        }
-                      >
-                        {Object.entries(operations).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="icon-button"
-                        aria-label="Remover cálculo"
-                        onClick={() =>
-                          change({
-                            ...config,
-                            aggregations: config.aggregations.filter(
-                              (_, n) => n !== i,
-                            ),
-                          })
-                        }
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                  <label>
-                    Agrupar cálculos por
-                    <select
-                      value={config.group_by[0] || ""}
-                      onChange={(e) =>
-                        change({
-                          ...config,
-                          group_by: e.target.value ? [e.target.value] : [],
-                        })
-                      }
-                    >
-                      <option value="">Sem agrupamento</option>
-                      {columns.map((c) => (
-                        <option key={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                </section>
-              </div>
+                    </label>
+                  </section>
+                </div>
+              </details>
               <div className="analysis-actions">
                 <button className="primary" disabled={busy} onClick={run}>
                   <Play size={16} />{" "}
@@ -629,7 +637,7 @@ export function DataLab() {
             <section className="panel results">
               <div className="panel-heading">
                 <div>
-                  <h2>Resultado da última execução</h2>
+                  <h2>Resultado</h2>
                   <p>
                     {result.total_rows.toLocaleString("pt-BR")} registros ·{" "}
                     {result.columns.length} colunas

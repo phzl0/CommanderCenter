@@ -438,6 +438,7 @@ export default function Agenda({
               <label>
                 Tipo
                 <select
+                  aria-label="Tipo"
                   name="kind"
                   defaultValue={editing?.kind || "appointment"}
                 >
@@ -484,6 +485,7 @@ export default function Agenda({
               <label>
                 Lembrete
                 <select
+                  aria-label="Lembrete"
                   name="reminder_minutes"
                   defaultValue={editing?.reminder_minutes ?? ""}
                 >

@@ -190,7 +190,9 @@ test("compact command center: five cards, news, calendar, files and exports", as
     .click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Título", { exact: true }).fill("Revisar orçamento");
-  await dialog.getByLabel("Tipo", { exact: true }).selectOption("todo");
+  await dialog
+    .getByRole("combobox", { name: "Tipo", exact: true })
+    .selectOption("todo");
   await dialog.getByLabel("Início", { exact: true }).fill("2026-11-03T09:00");
   await dialog.getByLabel("Fim", { exact: true }).fill("2026-11-03T09:30");
   await dialog
@@ -226,6 +228,7 @@ test("compact command center: five cards, news, calendar, files and exports", as
   await expect(
     page.getByRole("heading", { name: "vendas.csv", exact: true }),
   ).toBeVisible();
+  await page.locator(".analysis-options summary").click();
   await page
     .getByRole("button", { name: "Adicionar", exact: true })
     .nth(1)
@@ -241,6 +244,7 @@ test("compact command center: five cards, news, calendar, files and exports", as
   await page
     .getByRole("button", { name: "Salvar configuração", exact: true })
     .click();
+  await page.locator(".analysis-options summary").click();
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "XLSX", exact: true }).click();
   expect((await downloading).suggestedFilename()).toMatch(/\.xlsx$/);

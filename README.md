@@ -3,19 +3,19 @@
 Interface compacta, calendário com lembretes e dados/arquivos unificados. [Guia desta versão](docs/interface-simples.md).
 
 
-Dashboard privado para gestão de projetos, tarefas, atividades e análise de planilhas. MVP 1 com funcionamento independente de IA. O nome do repositório é `CommanderCenter`; a aplicação usa a marca **Command Center**.
+Centro privado de informações, calendário e análise de documentos. Funciona sem IA. O nome do repositório é `CommanderCenter`; a aplicação usa a marca **Command Center**.
 
 ## Funcionalidades
 
-- Acesso privado por sessão; contas criadas no terminal, sem cadastro público.
-- Projetos com descrição, prazo e situação, incluindo arquivamento.
-- Tarefas com prioridade, prazo, vínculo opcional com projeto e conclusão/reabertura.
-- Histórico automático de conclusão e registro manual de atividades.
-- Dashboard com projetos ativos, tarefas abertas, atrasadas, concluídas e atividades recentes.
-- Importação de CSV, XLSX e XLS com prévia e opções de leitura.
-- Seleção de colunas, filtros, soma, média, contagem e agrupamento; análises salvas e reutilizáveis.
-- Relatórios de gestão e de análises, exportados em CSV, Excel e PDF.
-- Download de originais e exclusão de arquivos e relatórios.
+- Autenticação privada, perfil, preferências e controle de sessões.
+- Visão geral com até cinco cards, quinto em largura inteira e tipos repetidos.
+- Notícias em página própria com imagens, categorias, manchetes e carrossel de dois segundos.
+- Calendário mensal com compromissos, afazeres, avisos e lembretes internos/e-mail.
+- Dados e arquivos: PDF, CSV, XLSX e XLS, filtros, cálculos e análises salvas.
+- Relatórios em PDF, CSV e Excel; download de originais.
+- Fontes RSS personalizadas e conexões GitHub, Microsoft e Google Calendar.
+- Registros pessoais/financeiros, clima por hora e indicadores econômicos.
+- Dados anteriores de tarefas, projetos e metas preservados; suas abas saíram do menu.
 
 ## Executar no Ubuntu com Docker
 

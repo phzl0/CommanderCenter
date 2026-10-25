@@ -1,28 +1,23 @@
-# Estado atual do Command Center
+# Estado atual do Command Center — 0.7
+
+MVP local, privado e independente de IA. Interface compacta em grafite/azul e logo vetorial compartilhado com o favicon.
 
 ## Implementado
 
-MVP local com autenticação privada, isolamento por conta, tarefas, importação e análise de CSV/Excel e relatórios CSV/Excel/PDF. Há registros pessoais e financeiros manuais, cards configuráveis e repetidos, quatro slots por padrão, carrossel de notícias, fontes RSS personalizadas, favoritos, histórico de leitura, páginas de detalhes, notificações internas e restauração das exclusões compatíveis. O backend mantém projetos e atividades; suas abas foram retiradas do menu por decisão de produto.
+- Visão geral: cinco cards no máximo, quinto largo, tipos repetidos e detalhes em página própria.
+- Notícias: imagens, destaques automáticos a cada dois segundos, categorias e manchetes paginadas.
+- Agenda: calendário mensal, seleção do dia, compromissos, afazeres e avisos; lembretes persistentes no Command e por SMTP.
+- Dados e arquivos: originais privados, CSV/Excel, texto de PDFs, filtros e cálculos opcionais, análises salvas e exportação de relatórios.
+- Fontes e conexões: RSS, GitHub público, Microsoft somente leitura e Google Calendar somente leitura.
+- Perfil, avatar, preferências, senha, sessões, notificações e restauração das exclusões compatíveis.
+- Clima com busca de cidade, localização opcional e previsão por hora; mercado, indicadores econômicos e registros manuais.
 
-Há consultas públicas de GitHub, indicadores BCB, clima Open-Meteo e ações Alpha Vantage. O código OAuth para GitHub e Microsoft está pronto, com tokens criptografados e permissões de leitura. O card Microsoft consulta Planner/To Do. As conexões OAuth exigem cadastro dos aplicativos e configuração local; testes simulados não substituem a validação com as contas reais. Veja [conexões](connections.md).
+Metas, Tarefas, Meu dia e Projetos saíram do menu. Os dados e APIs anteriores são preservados. Salvas/lidas saíram da interface de notícias. Configurações de cards além do quinto são mantidas ocultas.
 
-O tema usa fundo azul muito escuro, superfícies azul-marinho e uma paleta próxima de azul e verde-claro. As legendas e rótulos continuam identificando as séries sem depender só de cor.
+## Limites e próximos passos
 
-A aba Meu dia inclui captura rápida, contexto pessoal/profissional, três prioridades, prazos locais, fechamento diário e revisão de sete dias. Consulte [Meu dia](meu-dia.md).
+As conexões reais exigem as credenciais do usuário no ambiente local. E-mail requer SMTP e serviços ligados; não há entrega garantida com o computador desligado. PDFs sem camada de texto exigem OCR; valores e tabelas não são interpretados automaticamente. Cotações/previsões e notícias dependem dos provedores. Marcadores mensais da agenda são locais; Google é consultado no dia selecionado.
 
-## Próximos passos práticos
+Backup/restauração local continua importante, preservando banco, arquivos e chave de criptografia das conexões. Publicação/deploy permanece fora desta etapa.
 
-1. Configurar e validar as conexões desejadas: GitHub/Microsoft e chave Alpha Vantage, quando usadas. A conexão GitHub atual lista repositórios públicos; privados ainda não estão incluídos.
-2. Validar a rotina com dados reais: categorias de notícias, imagens fornecidas pelos feeds, planilhas pessoais, relatórios e permissões/licenças da organização Microsoft. Integrações podem ter atrasos, cotas e indisponibilidade.
-3. Executar e conferir backup/restauração local do banco e do volume de arquivos, preservando a chave de criptografia das conexões. O procedimento manual existe; backup automático ainda não foi implementado.
-4. Somente na etapa de publicação: configurar hospedagem, HTTPS, segredos, domínio, monitoramento e operação em produção. O Compose atual continua voltado ao uso local.
-
-## Conta e planejamento (0.6)
-
-Implementados perfil privado, foto, preferências, central de conexões, troca de senha, controle de sessões, etiquetas/filtros e recorrência nas tarefas, metas, agenda local com Google Calendar de leitura e alertas internos. Consulte [o guia de conta e planejamento](perfil-e-planejamento.md). A conexão Google exige cadastrar o aplicativo e autorizar a conta real.
-
-## Evoluções futuras
-
-Estimativas de duração de tarefas e blocos de expediente; sincronização/alertas em segundo plano; agente LangGraph opcional; acesso GitHub a repositórios privados; painel administrativo para criar contas e papéis (hoje criação por CLI). Mensagens de Teams/WhatsApp e outros aplicativos seguem fora da etapa atual por decisão do usuário. Conexões bancárias e conciliação automática não fazem parte do módulo financeiro manual.
-
-Estas evoluções não são requisitos pendentes para usar o MVP local. Nenhuma função principal depende de IA, e ainda não houve deploy.
+Consulte [o guia da versão](interface-simples.md) para uso e configuração de e-mail.

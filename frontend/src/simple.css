@@ -744,3 +744,36 @@ footer {
     width: 100%;
   }
 }
+
+.carousel-controls {
+  background: #18181b;
+  border-color: #303036;
+}
+.compact-grid .weather-hours {
+  min-height: 78px;
+  flex-shrink: 0;
+}
+.compact-grid .weather-current {
+  min-height: 80px;
+}
+.compact-grid .weather-view {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.analysis-options > summary {
+  cursor: pointer;
+  padding: 6px 0 14px;
+  color: #d4d4d8;
+  font-size: 13px;
+}
+.analysis-options[open] > summary {
+  margin-bottom: 12px;
+}
+.analysis-config {
+  padding-top: 12px;
+}
+.analysis-actions {
+  margin-top: 12px;
+}
