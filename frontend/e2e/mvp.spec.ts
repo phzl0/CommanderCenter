@@ -8,6 +8,8 @@ test("private workspace: management, spreadsheet analysis and export", async ({
       .locator(".toast-stack")
       .getByRole("button", { name: "Dispensar notificação", exact: true });
     while (await dismiss.count()) await dismiss.first().click();
+    if ((page.viewportSize()?.width || 1440) <= 760)
+      await expect(page.locator(".sidebar")).not.toBeInViewport();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: "test-results/" + name + ".png",
