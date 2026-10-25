@@ -801,3 +801,7 @@ footer {
 .compact-grid .widget-kpis span {
   font-size: 9px;
 }
+
+.compact-grid .card-detail-actions {
+  gap: 12px;
+}
