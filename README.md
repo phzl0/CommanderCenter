@@ -148,3 +148,7 @@ Radar com manchetes e imagens, três fontes iniciais e RSS personalizados por ca
 Quatro cards por padrão: dois indicadores fixos à esquerda, notícias com fotos em carrossel à direita e um card largo abaixo. A quantidade é ajustável e permite repetir tipos de card. [Guia do layout](docs/dashboard-layout.md).
 
 GitHub aceita link completo e seleção de repositórios públicos após conectar a conta. O novo card Tarefas do Teams consulta Planner/To Do em modo de leitura. OAuth requer registrar aplicativos e configurar o `.env`; [guia de ativação e limites](docs/connections.md). Nenhuma mensagem é acessada. A chave de criptografia das conexões acompanha o volume de arquivos privados: preserve esse volume no backup.
+
+## Tema de contraste e próximos passos
+
+Fundo preto, superfícies neutras e cores distintas por tipo de informação, com a mesma paleta nos gráficos da visão geral e dos detalhes. Consulte [o estado atual e as próximas etapas](docs/estado-atual.md) para distinguir recursos concluídos, ativação das conexões e evoluções futuras.

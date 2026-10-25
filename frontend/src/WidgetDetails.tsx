@@ -206,6 +206,7 @@ export default function WidgetDetails({
               <WeatherView weather={data.weather} city={data.city} detailed />
             ) : data.chart?.points.length ? (
               <WidgetChart
+                kind={widget.kind}
                 data={data.chart}
                 type={widget.config.chart_type}
                 id={"detail-" + id}

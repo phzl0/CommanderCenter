@@ -91,7 +91,10 @@ function WidgetCard({
   return (
     <section
       className={
-        "panel intelligence-card " + (widget.kind === "news" ? "news-card" : "")
+        "panel intelligence-card kind-" +
+        widget.kind +
+        " " +
+        (widget.kind === "news" ? "news-card" : "")
       }
       aria-label={widget.title}
     >
@@ -167,6 +170,7 @@ function WidgetCard({
             <WidgetChart
               data={data.chart}
               type={widget.config.chart_type}
+              kind={widget.kind}
               id={widget.id}
               height={150}
             />

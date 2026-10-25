@@ -11,7 +11,17 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import type { ChartData, Config } from "./intelligenceTypes";
+import type { ChartData, Config, Kind } from "./intelligenceTypes";
+const palettes: Partial<Record<Kind, string[]>> = {
+  personal: ["#5be0ad"],
+  tasks: ["#b8a0ff"],
+  finance: ["#4ddfc1", "#ff909d"],
+  github: ["#6ed8f2"],
+  macro: ["#e9bd62"],
+  stock: ["#ffab86"],
+  analysis: ["#ed9bd3"],
+  teams: ["#c1a5ff"],
+};
 const axisLabel = (s: unknown) =>
   typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
     ? s.slice(8, 10) + "/" + s.slice(5, 7)
@@ -21,30 +31,37 @@ export default function WidgetChart({
   type,
   id,
   height = 205,
+  kind,
 }: {
   data: NonNullable<ChartData["chart"]>;
   type: Config["chart_type"];
   id: string;
   height?: number;
+  kind?: Kind;
 }) {
+  const colors = kind ? palettes[kind] : undefined;
+  const series = data.series.map((s, i) => ({
+    ...s,
+    color: colors?.[i] || s.color,
+  }));
   const common = {
     data: data.points,
     margin: { top: 15, right: 12, bottom: 0, left: 0 },
   };
   const axes = (
     <>
-      <CartesianGrid stroke="#23344d" strokeDasharray="3 5" vertical={false} />
+      <CartesianGrid stroke="#333333" strokeDasharray="3 5" vertical={false} />
       <XAxis
         dataKey="label"
         tickFormatter={axisLabel}
-        tick={{ fill: "#8ea4c3", fontSize: 10 }}
+        tick={{ fill: "#b5b5b5", fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         minTickGap={24}
       />
       <YAxis
         width={43}
-        tick={{ fill: "#8ea4c3", fontSize: 10 }}
+        tick={{ fill: "#b5b5b5", fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         tickFormatter={(n) =>
@@ -56,10 +73,10 @@ export default function WidgetChart({
       />
       <Tooltip
         contentStyle={{
-          background: "#111e33",
-          border: "1px solid #314966",
+          background: "#141414",
+          border: "1px solid #555555",
           borderRadius: 8,
-          color: "#e5efff",
+          color: "#eeeeee",
           fontSize: 12,
         }}
         labelFormatter={(v) => axisLabel(v)}
@@ -75,13 +92,13 @@ export default function WidgetChart({
     <div
       className="widget-chart"
       role="img"
-      aria-label={`Gráfico com ${data.points.length} pontos. Séries: ${data.series.map((s) => s.name).join(", ")}.`}
+      aria-label={`Gráfico com ${data.points.length} pontos. Séries: ${series.map((s) => s.name).join(", ")}.`}
     >
       <ResponsiveContainer width="100%" height={height} minWidth={0}>
         {type === "bar" ? (
           <BarChart {...common}>
             {axes}
-            {data.series.map((s) => (
+            {series.map((s) => (
               <Bar
                 isAnimationActive={false}
                 key={s.key}
@@ -96,7 +113,7 @@ export default function WidgetChart({
         ) : type === "line" ? (
           <LineChart {...common}>
             {axes}
-            {data.series.map((s) => (
+            {series.map((s) => (
               <Line
                 isAnimationActive={false}
                 key={s.key}
@@ -113,7 +130,7 @@ export default function WidgetChart({
         ) : (
           <AreaChart {...common}>
             <defs>
-              {data.series.map((s, i) => (
+              {series.map((s, i) => (
                 <linearGradient
                   key={s.key}
                   id={`gradient-${id}-${i}`}
@@ -128,7 +145,7 @@ export default function WidgetChart({
               ))}
             </defs>
             {axes}
-            {data.series.map((s, i) => (
+            {series.map((s, i) => (
               <Area
                 isAnimationActive={false}
                 key={s.key}
@@ -145,7 +162,7 @@ export default function WidgetChart({
         )}
       </ResponsiveContainer>
       <div className="chart-legend">
-        {data.series.map((s) => (
+        {series.map((s) => (
           <span key={s.key}>
             <i style={{ background: s.color }} />
             {s.name}

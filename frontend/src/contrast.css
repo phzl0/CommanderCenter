@@ -1,0 +1,468 @@
+/* Neutral black surfaces, with a distinct accent for each information source. */
+:root {
+  background: #000;
+  color: #ededed;
+  --line: #303030;
+  --muted: #b0b0b0;
+}
+body {
+  background: #000;
+}
+h1,
+h2,
+h3 {
+  color: #f5f5f5;
+}
+p {
+  color: #b7b7b7;
+}
+.sidebar {
+  background: #080808;
+  border-color: #282828;
+  box-shadow: none;
+}
+.topbar {
+  background: #080808ed;
+  border-color: #292929;
+}
+.panel {
+  background: #101010;
+  border-color: #333;
+  box-shadow: 0 8px 24px #0004;
+}
+.modal,
+.notification-inbox,
+.login-form {
+  background: #121212;
+  border-color: #414141;
+}
+.modal-backdrop {
+  background: #000b;
+}
+.login-page {
+  background: #000;
+}
+.login-story {
+  background:
+    radial-gradient(ellipse at 20% 20%, #251c3566, transparent 65%), #080808;
+}
+button {
+  background: #1d1d1d;
+  border-color: #424242;
+  color: #e0e0e0;
+}
+button:hover {
+  background: #292929;
+  border-color: #666;
+}
+button.primary {
+  background: #416fe2;
+  border-color: #7697ef;
+  box-shadow: none;
+}
+button.primary:hover {
+  background: #507de9;
+  box-shadow: 0 0 16px #547fea26;
+}
+input,
+select,
+textarea {
+  background: #080808;
+  border-color: #494949;
+  color: #f2f2f2;
+}
+input::placeholder {
+  color: #949494;
+}
+.icon-button {
+  background: transparent;
+  color: #b7b7b7;
+}
+.icon-button:hover {
+  color: #fff;
+  background: #292929;
+}
+.sidebar nav button {
+  color: #b3b3b3;
+}
+.sidebar nav button:hover {
+  background: #202020;
+  color: #fff;
+}
+.sidebar nav button.selected {
+  background: #182135;
+  color: #b6ceff;
+  border-color: #385581;
+}
+.brand-light {
+  color: #aaa;
+}
+.nav-label,
+.topbar > div,
+.local-badge,
+.eyebrow,
+.page-heading p,
+.intelligence-heading p {
+  color: #aaa;
+}
+.topbar strong,
+.user-card strong {
+  color: #e0e0e0;
+}
+.user-card,
+.panel-heading,
+.record,
+.upcoming,
+.app-footer {
+  border-color: #303030;
+}
+.user-card small,
+.private-note small {
+  color: #aaa;
+}
+.private-note,
+.workspace-status {
+  background: #111;
+  border-color: #353535;
+}
+.private-note span,
+.workspace-status,
+.workspace-status > span {
+  color: #c8c8c8;
+}
+.segment,
+.search,
+.record-tabs {
+  background: #0c0c0c;
+  border-color: #404040;
+}
+.segment button {
+  background: transparent;
+  color: #b2b2b2;
+}
+.segment button.active {
+  background: #30364a;
+  color: #f2f2f2;
+}
+.workspace-status b {
+  color: #f5f5f5;
+}
+.dashboard-toolbar small,
+.radar-bottom,
+.sources-footnote,
+.detail-metadata > span {
+  color: #aaa;
+}
+.intelligence-card {
+  --card-accent: #9ebcff;
+  border-top: 2px solid var(--card-accent);
+}
+.kind-personal {
+  --card-accent: #5be0ad;
+}
+.kind-tasks {
+  --card-accent: #b8a0ff;
+}
+.kind-finance {
+  --card-accent: #4ddfc1;
+}
+.kind-github {
+  --card-accent: #6ed8f2;
+}
+.kind-news {
+  --card-accent: #f0c36b;
+}
+.kind-macro {
+  --card-accent: #e9bd62;
+}
+.kind-stock {
+  --card-accent: #ffab86;
+}
+.kind-analysis {
+  --card-accent: #ed9bd3;
+}
+.kind-weather {
+  --card-accent: #f4d27c;
+}
+.kind-teams {
+  --card-accent: #c1a5ff;
+}
+.widget-heading h2 {
+  color: #f2f2f2;
+}
+.widget-heading > div:nth-child(2) > span,
+.widget-kpis span {
+  color: #aaa;
+}
+.widget-kpis strong {
+  color: #f5f5f5;
+}
+.widget-kpis strong.negative {
+  color: #ff9fa9;
+}
+.widget-symbol.personal,
+.catalogue-icon.personal {
+  background: #132c22;
+  border-color: #2c634c;
+  color: #5be0ad;
+}
+.widget-symbol.finance,
+.catalogue-icon.finance {
+  background: #112d26;
+  border-color: #2d6658;
+  color: #4ddfc1;
+}
+.widget-symbol.tasks,
+.catalogue-icon.tasks {
+  background: #272039;
+  border-color: #655482;
+  color: #b8a0ff;
+}
+.widget-symbol.github,
+.catalogue-icon.github {
+  background: #142a30;
+  border-color: #39616d;
+  color: #6ed8f2;
+}
+.widget-symbol.news,
+.catalogue-icon.news {
+  background: #302615;
+  border-color: #76603a;
+  color: #f0c36b;
+}
+.widget-symbol.macro,
+.catalogue-icon.macro {
+  background: #2d2516;
+  border-color: #725c32;
+  color: #e9bd62;
+}
+.widget-symbol.stock,
+.catalogue-icon.stock {
+  background: #342219;
+  border-color: #805c44;
+  color: #ffab86;
+}
+.widget-symbol.analysis,
+.catalogue-icon.analysis {
+  background: #2e1e2a;
+  border-color: #754b68;
+  color: #ed9bd3;
+}
+.widget-symbol.weather,
+.catalogue-icon.weather {
+  background: #2e2818;
+  border-color: #796b42;
+  color: #f4d27c;
+}
+.widget-symbol.teams,
+.catalogue-icon.teams {
+  background: #282036;
+  border-color: #67527d;
+  color: #c1a5ff;
+}
+.widget-provenance {
+  border-color: #303030;
+  color: #b5b5b5;
+}
+.widget-provenance time,
+.widget-note,
+.data-date,
+.chart-legend {
+  color: #aaa;
+}
+.card-detail-actions {
+  border-color: #333;
+}
+.card-detail-actions a,
+.card-detail-actions button.quiet {
+  color: var(--card-accent, #b9cfff);
+}
+.widget-empty {
+  color: var(--card-accent, #c3c3c3);
+}
+.widget-empty h3 {
+  color: #dedede;
+}
+.widget-empty p {
+  color: #b0b0b0;
+}
+.widget-empty.error-state p {
+  color: #e1b68f;
+}
+.widget-empty.error-state {
+  color: #ffbf85;
+}
+.widget-catalogue > button {
+  background: #151515;
+  border-color: #3b3b3b;
+}
+.widget-catalogue > button:hover {
+  background: #222;
+  border-color: #777;
+}
+.widget-catalogue strong,
+.detail-suggestions h2,
+.detail-configuration dd {
+  color: #e6e6e6;
+}
+.widget-catalogue p,
+.widget-catalogue small,
+.detail-suggestions ul,
+.detail-configuration dt {
+  color: #b2b2b2;
+}
+.widget-management > div,
+.detail-metadata,
+.detail-kpis,
+.detail-source-note {
+  border-color: #353535;
+}
+.detail-kpis strong {
+  color: #f5f5f5;
+}
+.detail-kpis span,
+.detail-source-note,
+.detail-suggestions > small {
+  color: #b4b4b4;
+}
+.news-feed article {
+  background: #171717;
+  border-color: #383838;
+}
+.news-image-placeholder {
+  background: linear-gradient(135deg, #30291a, #171717);
+  color: #d5b67b;
+}
+.news-title {
+  color: #f2e4c5;
+}
+.news-title:hover {
+  color: #ffcf72;
+}
+.read .news-title {
+  color: #c4b9a4;
+}
+.news-content > p,
+.news-byline > small,
+.news-meta {
+  color: #b7b1a7;
+}
+.news-byline > span {
+  color: #f3d18b;
+  background: #302719;
+  border-color: #66532f;
+}
+.news-actions .saved {
+  color: #79dfb6;
+}
+.carousel-controls {
+  background: #141414;
+  border-color: #373737;
+}
+.carousel-controls > span {
+  color: #e5d1a9;
+}
+.source-guidance {
+  background: #18150e;
+  border-color: #594a2c;
+  color: #ebc77d;
+}
+.source-guidance strong {
+  color: #efdcac;
+}
+.source-guidance p,
+.source-url {
+  color: #c0b599;
+}
+.source-health,
+.source-preview {
+  border-color: #3b4e41;
+}
+.source-health {
+  color: #9dc8b0;
+}
+.source-url {
+  color: #b8b8b8;
+}
+.sources-toolbar .search,
+.source-checkboxes label {
+  background: #141414;
+  border-color: #444;
+}
+.account-connection,
+.selected-source {
+  background: #171717;
+  border-color: #4e4e4e;
+}
+.account-connection > strong,
+.selected-source strong,
+.search-results strong {
+  color: #eee;
+}
+.account-connection small,
+.selected-source span,
+.search-results small {
+  color: #b4b4b4;
+}
+.connection-help {
+  border-color: #484848;
+}
+.notification-inbox-heading,
+.notification-items article {
+  border-color: #353535;
+}
+.notification-items article.unread {
+  background: #242014;
+  border-left-color: #e4bf6e;
+}
+.notification-text strong {
+  color: #eee;
+}
+.notification-text p,
+.notification-text small {
+  color: #b0b0b0;
+}
+.system-toast {
+  background: #11231b;
+  border-color: #3e7057;
+}
+.system-toast.info {
+  background: #1d2030;
+  border-color: #616b9a;
+}
+.system-toast.warning {
+  background: #2a2315;
+  border-color: #947640;
+}
+.system-toast.error {
+  background: #2b1920;
+  border-color: #94566a;
+}
+table th {
+  background: #202020;
+  color: #ddd;
+}
+table td {
+  border-color: #333;
+  color: #d3d3d3;
+}
+table tbody tr:hover {
+  background: #222;
+}
+.weather-current strong {
+  color: #f5ead2;
+}
+.weather-current > div > span,
+.weather-current p,
+.weather-facts,
+.weather-days,
+.weather-timestamp {
+  color: #c4bcaa;
+}
+.weather-days {
+  border-color: #3d3930;
+}
+.app-footer {
+  color: #999;
+  background: #080808;
+}
