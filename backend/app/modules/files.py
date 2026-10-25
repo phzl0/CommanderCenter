@@ -1,10 +1,9 @@
-import io
 from pathlib import Path
 from uuid import uuid4
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.config import settings
@@ -65,8 +64,8 @@ async def upload(
 ):
     name = Path((file.filename or "").replace("\\", "/")).name
     suffix = Path(name).suffix.lower()
-    if suffix not in (".csv", ".xlsx", ".xls"):
-        raise HTTPException(422, "Envie CSV, XLSX ou XLS.")
+    if suffix not in (".csv", ".xlsx", ".xls", ".pdf"):
+        raise HTTPException(422, "Envie PDF, CSV, XLSX ou XLS.")
     if len(name) > 255 or not name:
         raise HTTPException(422, "Nome de arquivo inválido.")
     if (

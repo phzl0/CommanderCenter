@@ -49,3 +49,5 @@ xlrd==2.0.2
 defusedxml==0.7.1
 
 cryptography==47.0.0
+
+pypdf==6.21.2

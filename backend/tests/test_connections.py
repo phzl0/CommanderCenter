@@ -17,8 +17,10 @@ def setup_connection(monkeypatch, provider="github"):
 
 def test_layout_limit_and_duplicate_cards(client):
     ws = client.post("/api/intelligence/bootstrap").json()
-    assert ws["card_limit"] == 4
+    assert ws["card_limit"] == 5
     assert ws["widgets"][2]["kind"] == "news"
+    for w in ws["widgets"][:2]:
+        client.delete("/api/intelligence/widgets/" + w["id"])
     for title in ("GitHub A", "GitHub B"):
         result = client.post(
             "/api/intelligence/widgets",
@@ -49,17 +51,17 @@ def test_layout_limit_and_duplicate_cards(client):
             == 422
         )
     assert (
-        client.put("/api/intelligence/settings", json={"card_limit": 8}).status_code
+        client.put("/api/intelligence/settings", json={"card_limit": 5}).status_code
         == 200
     )
-    assert client.post("/api/intelligence/bootstrap").json()["card_limit"] == 8
-    for n in (0, 13):
+    assert client.post("/api/intelligence/bootstrap").json()["card_limit"] == 5
+    for n in (0, 6, 13):
         assert (
             client.put("/api/intelligence/settings", json={"card_limit": n}).status_code
             == 422
         )
     login_b(client)
-    assert client.post("/api/intelligence/bootstrap").json()["card_limit"] == 4
+    assert client.post("/api/intelligence/bootstrap").json()["card_limit"] == 5
 
 
 def test_oauth_pkce_private_storage_and_replay(client, env, monkeypatch):
@@ -222,7 +224,8 @@ def test_tasks_read_refresh_disconnect_and_owner(client, env, monkeypatch):
         }
 
     monkeypatch.setattr(integrations, "remote", remote)
-    client.post("/api/intelligence/bootstrap")
+    ws = client.post("/api/intelligence/bootstrap").json()
+    client.delete("/api/intelligence/widgets/" + ws["widgets"][0]["id"])
     w = client.post(
         "/api/intelligence/widgets", json={"title": "Teams", "kind": "teams"}
     ).json()
@@ -271,4 +274,4 @@ def test_existing_workspace_migration_keeps_preferences(env):
                 "SELECT days,card_limit FROM workspace_settings WHERE owner_id='user-a'"
             )
         ).one()
-        assert tuple(row) == (90, 4)
+        assert tuple(row) == (90, 5)

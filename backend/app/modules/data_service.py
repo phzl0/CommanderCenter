@@ -45,7 +45,32 @@ def load_frame(source, suffix, options=None, sheet=None):
     options = options or {}
     try:
         sheets = []
-        if suffix == ".csv":
+        if suffix == ".pdf":
+            import subprocess
+            import sys
+
+            raw = source if isinstance(source, bytes) else Path(source).read_bytes()
+            if not raw.startswith(b"%PDF-"):
+                raise HTTPException(422, "Arquivo PDF inválido.")
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "app.modules.pdf_reader"],
+                    input=raw,
+                    capture_output=True,
+                    timeout=15,
+                    check=True,
+                )
+                content = json.loads(result.stdout)
+            except (subprocess.SubprocessError, ValueError):
+                raise HTTPException(
+                    422,
+                    "Não foi possível processar o PDF dentro dos limites. Tente um arquivo menor.",
+                )
+            if content.get("error"):
+                raise HTTPException(422, content["error"])
+            df = pd.DataFrame(content["rows"], columns=["Página", "Texto"])
+            return df, []
+        elif suffix == ".csv":
             raw = source if isinstance(source, bytes) else Path(source).read_bytes()
             encoding = options.get("encoding", "utf-8-sig")
             decoded = raw.decode(encoding)

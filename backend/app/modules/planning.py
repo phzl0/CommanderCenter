@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
 from app.core.preferences import preferences, user_zone
-from app.models import User, Goal, Task, PersonalEntry, Appointment, now
+from app.models import User, Goal, Task, PersonalEntry, Appointment
 from app.modules.management import StrictModel, dump, owned
 from app.modules import integrations, providers
 
@@ -35,6 +35,11 @@ class AppointmentInput(StrictModel):
     start_at: datetime
     end_at: datetime
     context: Literal["personal", "professional", "general"] = "personal"
+    kind: Literal["appointment", "todo", "notice"] = "appointment"
+    completed: bool = False
+    reminder_minutes: int | None = Field(default=None, ge=0, le=10080)
+    notify_system: bool = True
+    notify_email: bool = False
 
 
 def goal_view(db, row):
@@ -165,7 +170,25 @@ def appointment_values(data, zone):
         raise HTTPException(
             422, "O fim deve ser posterior ao início, com duração de até sete dias."
         )
-    return {**data.model_dump(), "start_at": start, "end_at": end}
+    from app.modules.reminders import email_configured
+
+    if (
+        data.reminder_minutes is not None
+        and data.notify_email
+        and not email_configured()
+    ):
+        raise HTTPException(
+            422,
+            "Configure o envio de e-mail em Fontes e conexões antes de ativar este canal.",
+        )
+    return {
+        **data.model_dump(),
+        "start_at": start,
+        "end_at": end,
+        "reminder_at": start - timedelta(minutes=data.reminder_minutes)
+        if data.reminder_minutes is not None
+        else None,
+    }
 
 
 def event_view(row):
@@ -207,8 +230,17 @@ def update_appointment(
     user: User = Depends(current_user),
 ):
     row = owned(db, Appointment, identity, user)
-    for key, value in appointment_values(data, user_zone(db, user)).items():
+    values = appointment_values(data, user_zone(db, user))
+    changed = any(
+        getattr(row, key) != values[key]
+        for key in ("start_at", "reminder_minutes", "notify_system", "notify_email")
+    )
+    for key, value in values.items():
         setattr(row, key, value)
+    if changed:
+        row.system_sent_at = row.email_sent_at = row.email_attempt_at = (
+            row.email_error
+        ) = None
     db.commit()
     return event_view(row)
 
@@ -367,3 +399,63 @@ def agenda(
         "errors": errors,
         "note": "Capacidade é uma referência do dia. Sobreposições não contam duas vezes; eventos de dia inteiro não bloqueiam minutos. Tarefas ainda não têm estimativa de duração.",
     }
+
+
+@router.get("/month")
+def month(
+    year: int = Query(ge=2000, le=2100),
+    month: int = Query(ge=1, le=12),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    import calendar
+
+    zone = user_zone(db, user)
+    first = date(year, month, 1)
+    last = date(year, month, calendar.monthrange(year, month)[1])
+    start = utc_value(datetime.combine(first, time.min), zone)
+    end = utc_value(datetime.combine(last + timedelta(days=1), time.min), zone)
+    rows = list(
+        db.scalars(
+            select(Appointment)
+            .where(
+                Appointment.owner_id == user.id,
+                Appointment.start_at < end,
+                Appointment.end_at > start,
+            )
+            .order_by(Appointment.start_at)
+        )
+    )
+    counts = {}
+    for row in rows:
+        a = max(
+            first, row.start_at.replace(tzinfo=timezone.utc).astimezone(zone).date()
+        )
+        b = min(
+            last,
+            (row.end_at - timedelta(microseconds=1))
+            .replace(tzinfo=timezone.utc)
+            .astimezone(zone)
+            .date(),
+        )
+        while a <= b:
+            counts[a.isoformat()] = counts.get(a.isoformat(), 0) + 1
+            a += timedelta(days=1)
+    for task in db.scalars(
+        select(Task).where(
+            Task.owner_id == user.id,
+            Task.status != "completed",
+            Task.due_date >= first,
+            Task.due_date <= last,
+        )
+    ):
+        key = task.due_date.isoformat()
+        counts[key] = counts.get(key, 0) + 1
+    return {"days": counts, "scope": "local"}
+
+
+@router.get("/reminders/status")
+def reminder_status(user: User = Depends(current_user)):
+    from app.modules.reminders import email_configured
+
+    return {"email_configured": email_configured(), "interval_seconds": 30}

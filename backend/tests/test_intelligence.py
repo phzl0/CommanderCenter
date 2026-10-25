@@ -112,7 +112,9 @@ def test_finance_exact_amounts_and_personal(client):
 
 def test_widget_limit_and_no_reset_after_removal(client):
     workspace = bootstrap(client)
-    for i in range(6):
+    for w in workspace["widgets"]:
+        client.delete("/api/intelligence/widgets/" + w["id"])
+    for i in range(5):
         assert (
             client.post(
                 "/api/intelligence/widgets",
@@ -215,6 +217,7 @@ def test_provider_payloads_no_live_network(monkeypatch):
 
 def test_analysis_chart_and_cross_user_reference(client):
     workspace = bootstrap(client)
+    client.delete("/api/intelligence/widgets/" + workspace["widgets"][0]["id"])
     r = client.post(
         "/api/imports",
         files={"file": ("p.csv", b"categoria;valor\nA;10\nA;20\nB;5\n")},
@@ -259,7 +262,8 @@ def test_analysis_chart_and_cross_user_reference(client):
 
 
 def test_github_validation_and_stock_key_not_exposed(client, monkeypatch):
-    bootstrap(client)
+    ws=bootstrap(client)
+    client.delete("/api/intelligence/widgets/" + ws["widgets"][0]["id"])
     assert (
         client.post(
             "/api/intelligence/widgets",

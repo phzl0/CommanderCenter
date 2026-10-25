@@ -4,7 +4,7 @@ import json
 import math
 import re
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 from html import unescape
 from urllib.parse import urlparse
@@ -417,7 +417,14 @@ def city_search(query):
 
     raw = get_json(
         "https://geocoding-api.open-meteo.com/v1/search?"
-        + urlencode({"name": query, "count": 8, "language": "pt", "format": "json"})
+        + urlencode(
+            {
+                "name": query.split(",")[0].strip(),
+                "count": 20,
+                "language": "pt",
+                "format": "json",
+            }
+        )
     )
     return [
         {
@@ -467,8 +474,9 @@ def weather_data(latitude, longitude, city):
             {
                 "latitude": latitude,
                 "longitude": longitude,
-                "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
+                "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,precipitation",
                 "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                "hourly": "temperature_2m,precipitation_probability,weather_code",
                 "forecast_days": 7,
                 "timezone": "auto",
             }
@@ -500,6 +508,20 @@ def weather_data(latitude, longitude, city):
             "code": code,
             "condition": weather_label(code),
             "wind": current.get("wind_speed_10m"),
+            "humidity": current.get("relative_humidity_2m"),
+            "precipitation": current.get("precipitation"),
+            "hours": [
+                {
+                    "time": t,
+                    "temperature": raw["hourly"].get("temperature_2m", [None] * 168)[i],
+                    "rain": raw["hourly"].get(
+                        "precipitation_probability", [None] * 168
+                    )[i],
+                    "code": raw["hourly"].get("weather_code", [None] * 168)[i],
+                }
+                for i, t in enumerate(raw.get("hourly", {}).get("time", []))
+                if t >= current.get("time", "")
+            ][:24],
             "time": current.get("time"),
             "timezone": raw.get("timezone"),
             "days": days,

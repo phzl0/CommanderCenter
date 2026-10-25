@@ -230,7 +230,16 @@ def restore(
                 )
             )
         )
-        if count >= 12:
+        visible = sum(
+            w.visible and w.kind != "news"
+            for w in db.scalars(
+                select(DashboardWidget).where(
+                    DashboardWidget.owner_id == user.id,
+                    DashboardWidget.deleted_at.is_(None),
+                )
+            )
+        )
+        if row.visible and row.kind != "news" and visible >= 5:
             raise HTTPException(409, "Remova outro painel antes de restaurar este.")
     if kind == "source":
         count = len(

@@ -9,8 +9,8 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import Field, model_validator, field_validator
-from sqlalchemy import select, func
+from pydantic import Field, field_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
@@ -122,7 +122,7 @@ class WidgetInput(StrictModel):
 
 class PeriodInput(StrictModel):
     days: Literal[7, 30, 90] | None = None
-    card_limit: int | None = Field(default=None, ge=1, le=12)
+    card_limit: int | None = Field(default=None, ge=1, le=5)
 
 
 class OrderInput(StrictModel):
@@ -194,6 +194,7 @@ def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user))
                     title=title,
                     kind=kind,
                     position=position,
+                    visible=kind != "news",
                     config=WidgetConfig(**config).model_dump(),
                 )
             )
@@ -202,7 +203,7 @@ def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user))
     db.commit()
     return {
         "days": workspace.days,
-        "card_limit": workspace.card_limit,
+        "card_limit": min(5, workspace.card_limit),
         "widgets": [public_widget(w) for w in widgets_for(db, user)],
     }
 
@@ -230,7 +231,15 @@ def create_widget(
     rows = widgets_for(db, user)
     if len(rows) >= 12:
         raise HTTPException(
-            422, "Você pode manter até 12 painéis. Edite ou remova um existente."
+            422, "Remova uma configuração antiga antes de adicionar outra."
+        )
+    if (
+        data.kind != "news"
+        and data.visible
+        and sum(r.visible and r.kind != "news" for r in rows) >= 5
+    ):
+        raise HTTPException(
+            422, "Limite de cinco cards. Oculte ou remova um existente."
         )
     check_config(db, user, data)
     row = DashboardWidget(
@@ -252,6 +261,14 @@ def edit_widget(
     user: User = Depends(current_user),
 ):
     row = active_widget(db, user, identity)
+    db.scalar(select(User).where(User.id == user.id).with_for_update())
+    if (
+        data.visible
+        and data.kind != "news"
+        and not (row.visible and row.kind != "news")
+        and sum(w.visible and w.kind != "news" for w in widgets_for(db, user)) >= 5
+    ):
+        raise HTTPException(422, "Limite de cinco cards.")
     check_config(db, user, data)
     for key, value in data.model_dump().items():
         setattr(row, key, value)
@@ -718,3 +735,17 @@ def city_search(
         return providers.city_search(q)
     except providers.ProviderError as e:
         raise HTTPException(422, str(e))
+
+
+@router.get("/news")
+def news_page(
+    category: str = Query("", max_length=80),
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    old = next((w for w in widgets_for(db, user) if w.kind == "news"), None)
+    config = WidgetConfig(**(old.config if old else {}))
+    config.news_category = category
+    start, end = date_range(30, user_zone(db, user))
+    return newsroom.aggregate(db, user, config, start, end, refresh)

@@ -158,7 +158,7 @@ class WorkspaceSettings(Base):
     __tablename__ = "workspace_settings"
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     days: Mapped[int] = mapped_column(Integer, default=30)
-    card_limit: Mapped[int] = mapped_column(Integer, default=4, server_default="4")
+    card_limit: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
 
 
 class DashboardWidget(Owned, Base):
@@ -320,3 +320,22 @@ class Appointment(Owned, Base):
     start_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(DateTime)
     context: Mapped[str] = mapped_column(String(16), default="personal")
+
+    kind: Mapped[str] = mapped_column(
+        String(16), default="appointment", server_default="appointment"
+    )
+    completed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    reminder_minutes: Mapped[int | None] = mapped_column(Integer)
+    notify_system: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true")
+    )
+    notify_email: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    reminder_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
+    system_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    email_error: Mapped[str | None] = mapped_column(String(300))
