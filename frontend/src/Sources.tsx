@@ -11,6 +11,7 @@ import {
   Search,
   Bookmark,
 } from "lucide-react";
+import { formatInstant } from "./userPreferences";
 import { api, send } from "./api";
 import { confirmAction, dataChanged } from "./feedback";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
@@ -245,8 +246,7 @@ export default function Sources() {
                   <span>
                     {s.last_error ||
                       (s.checked_at
-                        ? "Última consulta: " +
-                          new Date(s.checked_at + "Z").toLocaleString("pt-BR")
+                        ? "Última consulta: " + formatInstant(s.checked_at)
                         : "Aguardando primeira consulta")}
                   </span>
                 </div>

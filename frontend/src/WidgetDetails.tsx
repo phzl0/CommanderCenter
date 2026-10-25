@@ -8,6 +8,7 @@ import {
   Database,
   AlertCircle,
 } from "lucide-react";
+import { formatInstant } from "./userPreferences";
 import { api } from "./api";
 import {
   catalogue,
@@ -143,11 +144,7 @@ export default function WidgetDetails({
             <Database size={14} />
             {data?.source || "Fonte não informada"}
           </span>
-          {data?.as_of && (
-            <span>
-              Consulta: {new Date(data.as_of).toLocaleString("pt-BR")}
-            </span>
-          )}
+          {data?.as_of && <span>Consulta: {formatInstant(data.as_of)}</span>}
           {data?.data_date && <span>Último dado: {data.data_date}</span>}
           <div
             className="segment"

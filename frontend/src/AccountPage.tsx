@@ -333,7 +333,7 @@ export default function AccountPage({
                 checked={prefs.deadline_alerts}
                 onChange={(e) => pref("deadline_alerts", e.target.checked)}
               />
-              Gerar alertas de prazos de tarefas
+              Gerar alertas de prazos e conexões sem consulta recente
             </label>
             <label>
               Antecedência dos alertas

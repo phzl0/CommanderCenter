@@ -48,7 +48,13 @@ export default function AccountMenu({
     { id: "security", name: "Segurança", Icon: ShieldCheck },
   ] as const;
   return (
-    <div className="account-menu" ref={root}>
+    <div
+      className="account-menu"
+      ref={root}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+      }}
+    >
       <button
         className="profile-trigger"
         ref={trigger}

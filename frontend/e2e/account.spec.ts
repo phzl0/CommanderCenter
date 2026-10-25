@@ -74,6 +74,19 @@ test("private profile preferences recurring goals agenda and security", async ({
     page.getByRole("img", { name: "Foto do perfil", exact: true }),
   ).toBeVisible();
   await capture("profile-desktop");
+  await page
+    .getByRole("button", { name: "Abrir menu do perfil", exact: true })
+    .click();
+  await expect(
+    page.getByRole("menu", { name: "Opções da conta", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("menu", { name: "Opções da conta", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Abrir menu do perfil", exact: true }),
+  ).toBeFocused();
   await menu("Preferências");
   await page
     .getByLabel("Página inicial", { exact: true })

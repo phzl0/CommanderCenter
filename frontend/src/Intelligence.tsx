@@ -1,3 +1,4 @@
+import { getPreferences, formatInstant } from "./userPreferences";
 import { confirmAction, detailUrl } from "./feedback";
 import { useEffect, useState } from "react";
 import {
@@ -233,8 +234,9 @@ function WidgetCard({
               {data?.source || "Dados do seu espaço"}
             </span>
             {data?.as_of && (
-              <time title={new Date(data.as_of).toLocaleString("pt-BR")}>
+              <time title={formatInstant(data.as_of)}>
                 {new Date(data.as_of).toLocaleTimeString("pt-BR", {
+                  timeZone: getPreferences().timezone,
                   hour: "2-digit",
                   minute: "2-digit",
                 })}

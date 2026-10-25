@@ -8,6 +8,7 @@ import {
   X,
   Undo2,
 } from "lucide-react";
+import { formatInstant } from "./userPreferences";
 import { api } from "./api";
 import {
   notify,
@@ -252,9 +253,7 @@ export function NotificationBell() {
                   >
                     <strong>{n.title}</strong>
                     {n.message && <p>{n.message}</p>}
-                    <small>
-                      {new Date(n.created_at + "Z").toLocaleString("pt-BR")}
-                    </small>
+                    <small>{formatInstant(n.created_at)}</small>
                   </button>
                   {n.target && (
                     <div className="notice-actions">
