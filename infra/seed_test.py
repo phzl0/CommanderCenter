@@ -15,4 +15,11 @@ with SessionLocal() as db:
             password_hash=passwords.hash("disposable-e2e-password"),
         )
     )
+    db.add(
+        User(
+            name="Conta de teste",
+            email="account@example.test",
+            password_hash=passwords.hash("disposable-account-password"),
+        )
+    )
     db.commit()

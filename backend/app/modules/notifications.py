@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
@@ -6,8 +6,11 @@ from sqlalchemy import select, delete, update
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
+from app.core.preferences import preferences, user_zone
 from app.models import (
     User,
+    Task,
+    IntegrationConnection,
     Notification,
     DashboardWidget,
     PersonalEntry,
@@ -38,7 +41,16 @@ class NoticeInput(StrictModel):
     action: Action | None = None
 
 
-def record(db, user, title, message="", level="success", action=None, fingerprint=None):
+def record(
+    db,
+    user,
+    title,
+    message="",
+    level="success",
+    action=None,
+    fingerprint=None,
+    target=None,
+):
     if fingerprint:
         existing = db.scalar(
             select(Notification).where(
@@ -56,6 +68,7 @@ def record(db, user, title, message="", level="success", action=None, fingerprin
         level=level,
         action=action,
         fingerprint=fingerprint,
+        target=target,
     )
     db.add(row)
     db.flush()
@@ -76,8 +89,73 @@ def record(db, user, title, message="", level="success", action=None, fingerprin
     return row
 
 
+def collect_deadlines(db, user):
+    pref = preferences(db, user)
+    if not pref["deadline_alerts"]:
+        return
+    day = datetime.now(user_zone(db, user)).date()
+    tasks = db.scalars(
+        select(Task)
+        .where(
+            Task.owner_id == user.id,
+            Task.status != "completed",
+            Task.due_date <= day + timedelta(days=pref["alert_days"]),
+        )
+        .order_by(Task.due_date)
+        .limit(30)
+    )
+    for task in list(tasks):
+        key = f"deadline:{day}:{task.id}"
+        if db.scalar(
+            select(Notification.id).where(
+                Notification.owner_id == user.id, Notification.fingerprint == key
+            )
+        ):
+            continue
+        state = (
+            "Tarefa atrasada"
+            if task.due_date < day
+            else "Tarefa vence hoje"
+            if task.due_date == day
+            else "Prazo próximo"
+        )
+        record(
+            db,
+            user,
+            state,
+            task.title + " · " + task.due_date.strftime("%d/%m/%Y"),
+            level="warning" if task.due_date <= day else "info",
+            fingerprint=key,
+            target={"kind": "task", "id": task.id},
+        )
+    for connection in db.scalars(
+        select(IntegrationConnection).where(
+            IntegrationConnection.owner_id == user.id,
+            IntegrationConnection.checked_at < now() - timedelta(days=1),
+        )
+    ):
+        key = f"stale:{day}:{connection.provider}"
+        if not db.scalar(
+            select(Notification.id).where(
+                Notification.owner_id == user.id, Notification.fingerprint == key
+            )
+        ):
+            record(
+                db,
+                user,
+                "Conexão sem consulta recente",
+                connection.provider
+                + " · confira a última atualização na central de conexões.",
+                level="info",
+                fingerprint=key,
+                target={"kind": "connections"},
+            )
+    db.commit()
+
+
 @router.get("")
 def list_notices(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    collect_deadlines(db, user)
     rows = list(
         db.scalars(
             select(Notification)
@@ -98,6 +176,14 @@ def add(
         row = owned(db, RECYCLE[action["kind"]], action["id"], user)
         if not row.deleted_at:
             raise HTTPException(409, "O registro não está na lixeira.")
+    if (
+        data.level == "success"
+        and not preferences(db, user)["notify_success"]
+        and not action
+    ):
+        from fastapi import Response
+
+        return Response(status_code=204)
     row = record(db, user, data.title, data.message, data.level, action)
     db.commit()
     return dump(row)

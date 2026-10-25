@@ -15,9 +15,11 @@ from app.modules import (
     newsroom,
     integrations,
     daily,
+    account,
+    planning,
 )
 
-app = FastAPI(title="Command Center", version="0.5.0")
+app = FastAPI(title="Command Center", version="0.6.0")
 app.include_router(auth.router)
 app.include_router(management.router)
 app.include_router(files.router)
@@ -27,6 +29,8 @@ app.include_router(notifications.router)
 app.include_router(newsroom.router)
 app.include_router(integrations.router)
 app.include_router(daily.router)
+app.include_router(account.router)
+app.include_router(planning.router)
 
 
 @app.middleware("http")

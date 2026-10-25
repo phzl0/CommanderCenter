@@ -14,8 +14,10 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
+from app.core.preferences import user_zone
 from app.models import (
     User,
+    Goal,
     WorkspaceSettings,
     DashboardWidget,
     PersonalEntry,
@@ -128,6 +130,7 @@ class OrderInput(StrictModel):
 
 
 class PersonalInput(StrictModel):
+    goal_id: str | None = None
     label: str = Field(min_length=1, max_length=100)
     minutes: int = Field(gt=0, le=1440)
     entry_date: date
@@ -309,6 +312,8 @@ def add_personal(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    if data.goal_id and owned(db, Goal, data.goal_id, user).metric != "minutes":
+        raise HTTPException(422, "Registros de tempo precisam de uma meta em minutos.")
     row = PersonalEntry(owner_id=user.id, **data.model_dump())
     db.add(row)
     db.commit()
@@ -322,6 +327,8 @@ def edit_personal(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    if data.goal_id and owned(db, Goal, data.goal_id, user).metric != "minutes":
+        raise HTTPException(422, "Registros de tempo precisam de uma meta em minutos.")
     row = owned(db, PersonalEntry, identity, user)
     if row.deleted_at:
         raise HTTPException(404, "Registro não encontrado.")
@@ -380,8 +387,8 @@ def remove_entry(
     db.commit()
 
 
-def date_range(days):
-    end = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+def date_range(days, zone=None):
+    end = datetime.now(zone or ZoneInfo("America/Sao_Paulo")).date()
     return end - timedelta(days=days - 1), end
 
 
@@ -579,7 +586,7 @@ def widget_data(
         raise HTTPException(422, "Escolha 7, 30 ou 90 dias.")
     row = active_widget(db, user, identity)
     config = WidgetConfig(**row.config)
-    start, end = date_range(days)
+    start, end = date_range(days, user_zone(db, user))
     key = hashlib.sha256(
         json.dumps([days, end.isoformat(), row.config], sort_keys=True).encode()
     ).hexdigest()

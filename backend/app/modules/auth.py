@@ -13,7 +13,8 @@ from app.core.security import (
     COOKIE,
     token_hash,
 )
-from app.models import User, SessionToken
+from app.models import User, SessionToken, now
+from app.core.preferences import account_view
 
 router = APIRouter(prefix="/api/auth", tags=["Acesso"])
 
@@ -24,8 +25,8 @@ class Login(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
-def public_user(user):
-    return {"id": user.id, "name": user.name, "email": user.email}
+def public_user(user, db):
+    return account_view(db, user)
 
 
 @router.post("/login")
@@ -47,22 +48,38 @@ def login(
         db.execute(
             delete(SessionToken).where(SessionToken.token_hash == token_hash(old))
         )
-    token = create_session(db, user)
+    token = create_session(db, user, request.headers.get("user-agent", ""))
     response.set_cookie(
         COOKIE,
         token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        samesite="lax",
         max_age=settings.session_hours * 3600,
         path="/api",
     )
-    return public_user(user)
+    return public_user(user, db)
 
 
 @router.get("/me")
-def me(user: User = Depends(current_user)):
-    return public_user(user)
+def me(
+    request: Request,
+    response: Response,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    token = request.cookies.get(COOKIE, "")
+    session = db.get(SessionToken, token_hash(token))
+    response.set_cookie(
+        COOKIE,
+        token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=max(1, int((session.expires_at - now()).total_seconds())),
+        path="/api",
+    )
+    return public_user(user, db)
 
 
 @router.post("/logout", status_code=204)

@@ -29,7 +29,7 @@ from app.models import (
 from app.modules import providers
 
 router = APIRouter(prefix="/api/integrations", tags=["Conexões somente leitura"])
-Provider = Literal["github", "microsoft"]
+Provider = Literal["github", "microsoft", "google"]
 
 
 def cipher():
@@ -72,6 +72,14 @@ def specification(provider):
             "authorize": "https://github.com/login/oauth/authorize",
             "token": "https://github.com/login/oauth/access_token",
             "scope": "read:user",
+        }
+    if provider == "google":
+        return {
+            "id": settings.google_client_id,
+            "secret": settings.google_client_secret,
+            "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token": "https://oauth2.googleapis.com/token",
+            "scope": "openid email profile https://www.googleapis.com/auth/calendar.readonly",
         }
     if not re.fullmatch(
         r"organizations|common|[A-Za-z0-9.-]{1,100}", settings.microsoft_tenant
@@ -125,6 +133,8 @@ def remote(method, url, *, data=None, token=None):
             "api.github.com",
             "login.microsoftonline.com",
             "graph.microsoft.com",
+            "www.googleapis.com",
+            "oauth2.googleapis.com",
         }
         or parsed.username
         or parsed.port not in (None, 443)
@@ -209,7 +219,13 @@ def credentials(db, user, provider):
 
 
 def invalidate(db, user, provider):
-    kind = "github" if provider == "github" else "teams"
+    kind = (
+        "github"
+        if provider == "github"
+        else "teams"
+        if provider == "microsoft"
+        else "calendar"
+    )
     for w in db.scalars(
         select(DashboardWidget).where(
             DashboardWidget.owner_id == user.id, DashboardWidget.kind == kind
@@ -226,9 +242,16 @@ def status(db: Session = Depends(get_db), user: User = Depends(current_user)):
             "configured": configured(p),
             "connected": bool(r := connection(db, user, p)),
             "account": r.account if r else None,
+            "checked_at": r.checked_at if r else None,
+            "last_error": r.last_error if r else None,
+            "permissions": {
+                "github": ["Perfil", "Repositórios públicos (leitura)"],
+                "microsoft": ["Perfil", "Planner e To Do (leitura)"],
+                "google": ["Perfil", "Google Calendar (leitura)"],
+            }[p],
             "callback_url": callback_url(p),
         }
-        for p in ("github", "microsoft")
+        for p in ("github", "microsoft", "google")
     }
 
 
@@ -290,6 +313,14 @@ def start(
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
+    if provider == "google":
+        params.update(
+            {
+                "access_type": "offline",
+                "prompt": "consent",
+                "include_granted_scopes": "true",
+            }
+        )
     return {"url": spec["authorize"] + "?" + urlencode(params)}
 
 
@@ -340,9 +371,11 @@ def callback(
             access = data["access_token"]
             profile = remote(
                 "GET",
-                "https://api.github.com/user"
-                if provider == "github"
-                else "https://graph.microsoft.com/v1.0/me",
+                {
+                    "github": "https://api.github.com/user",
+                    "microsoft": "https://graph.microsoft.com/v1.0/me",
+                    "google": "https://www.googleapis.com/oauth2/v2/userinfo",
+                }[provider],
                 token=access,
             )
             db.scalar(select(User).where(User.id == user.id).with_for_update())
@@ -353,11 +386,16 @@ def callback(
             row.account = str(
                 profile.get("login")
                 or profile.get("userPrincipalName")
+                or profile.get("email")
                 or profile.get("displayName")
                 or "Conta conectada"
             )[:200]
             row.credentials = pack(
-                {k: data[k] for k in ("access_token", "refresh_token") if k in data}
+                {
+                    k: data[k]
+                    for k in ("access_token", "refresh_token", "scope")
+                    if k in data
+                }
             )
             row.expires_at = (
                 now() + timedelta(seconds=int(data["expires_in"]))
@@ -397,6 +435,35 @@ def disconnect(
     db.commit()
 
 
+def provider_read(db, user, provider, url):
+    try:
+        token = credentials(db, user, provider)
+        data = remote("GET", url, token=token)
+        row = connection(db, user, provider)
+        row.checked_at = now()
+        row.last_error = None
+        db.commit()
+        return data
+    except providers.ProviderError as e:
+        row = connection(db, user, provider)
+        if row:
+            row.checked_at = now()
+            row.last_error = str(e)[:300]
+            from app.modules.notifications import record
+
+            record(
+                db,
+                user,
+                "Falha na conexão",
+                provider + ": " + str(e),
+                level="warning",
+                fingerprint="integration:" + provider,
+                target={"kind": "connections"},
+            )
+            db.commit()
+        raise
+
+
 @router.get("/github/repositories")
 def repositories(
     page: int = 1, db: Session = Depends(get_db), user: User = Depends(current_user)
@@ -404,11 +471,11 @@ def repositories(
     if not 1 <= page <= 20:
         raise HTTPException(422, "Página inválida.")
     try:
-        token = credentials(db, user, "github")
-        items = remote(
-            "GET",
+        items = provider_read(
+            db,
+            user,
+            "github",
             f"https://api.github.com/user/repos?per_page=30&page={page}&sort=updated&visibility=public&affiliation=owner,collaborator,organization_member",
-            token=token,
         )
         return {
             "items": [
@@ -427,9 +494,11 @@ def repositories(
 def github_panel(db, user, repository, start, end):
     if not connection(db, user, "github"):
         return providers.github_data(repository, start, end)
-    token = credentials(db, user, "github")
     result = providers.github_data(
-        repository, start, end, getter=lambda url: remote("GET", url, token=token)
+        repository,
+        start,
+        end,
+        getter=lambda url: provider_read(db, user, "github", url),
     )
     result["message"] = (
         "Até 100 commits da branch padrão no período. Conexão de leitura para repositórios públicos."
@@ -440,11 +509,11 @@ def github_panel(db, user, repository, start, end):
 @router.get("/microsoft/lists")
 def task_lists(db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
-        token = credentials(db, user, "microsoft")
-        data = remote(
-            "GET",
+        data = provider_read(
+            db,
+            user,
+            "microsoft",
             "https://graph.microsoft.com/v1.0/me/todo/lists?$top=100",
-            token=token,
         )
         return [
             {"id": r["id"], "name": r["displayName"]} for r in data.get("value", [])
@@ -460,7 +529,6 @@ def task_panel(db, user, source, list_id):
             "source": "Microsoft Planner / To Do",
             "message": "Conecte sua conta Microsoft para consultar tarefas. Nenhuma mensagem será acessada.",
         }
-    token = credentials(db, user, "microsoft")
     if source == "todo" and not list_id:
         return {
             "status": "needs_config",
@@ -472,7 +540,9 @@ def task_panel(db, user, source, list_id):
         if source == "planner"
         else "me/todo/lists/" + quote(list_id, safe="") + "/tasks?$top=100"
     )
-    data = remote("GET", "https://graph.microsoft.com/v1.0/" + path, token=token)
+    data = provider_read(
+        db, user, "microsoft", "https://graph.microsoft.com/v1.0/" + path
+    )
     items = []
     for r in data.get("value", [])[:100]:
         completed = (

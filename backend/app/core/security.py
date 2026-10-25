@@ -31,13 +31,15 @@ def current_user(request: Request, db: Session = Depends(get_db)):
     return user
 
 
-def create_session(db, user):
+def create_session(db, user, device=""):
+    db.scalar(select(User).where(User.id == user.id).with_for_update())
     db.execute(delete(SessionToken).where(SessionToken.expires_at <= now()))
     token = secrets.token_urlsafe(48)
     db.add(
         SessionToken(
             token_hash=token_hash(token),
             user_id=user.id,
+            device=device[:180],
             expires_at=now() + timedelta(hours=settings.session_hours),
         )
     )

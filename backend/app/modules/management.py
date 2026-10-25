@@ -2,12 +2,14 @@ from datetime import date, datetime, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
-from app.models import User, Project, Task, Activity, now
+from app.core.preferences import user_zone
+from app.modules.recurrence import generate_next
+from app.models import User, Project, Task, Activity, Goal, Notification, now
 
 router = APIRouter(prefix="/api", tags=["Gestão"])
 
@@ -41,6 +43,26 @@ class ProjectInput(StrictModel):
 
 
 class TaskInput(StrictModel):
+    goal_id: str | None = None
+    tags: list[str] = Field(default_factory=list, max_length=8)
+    recurrence: Literal["none", "daily", "weekly", "monthly"] = "none"
+
+    @field_validator("tags")
+    @classmethod
+    def valid_tags(cls, values):
+        cleaned = list(dict.fromkeys(v.strip().lower() for v in values if v.strip()))
+        if any(len(v) > 30 for v in cleaned):
+            raise ValueError("Cada etiqueta pode ter até 30 caracteres.")
+        return cleaned
+
+    @model_validator(mode="after")
+    def repeat_needs_date(self):
+        if self.recurrence != "none" and (
+            not self.due_date or not 2000 <= self.due_date.year <= 2099
+        ):
+            raise ValueError("Tarefas recorrentes precisam de prazo entre 2000 e 2099.")
+        return self
+
     context: Literal["personal", "professional", "general"] = "general"
     title: str = Field(min_length=1, max_length=160)
     description: str = Field(default="", max_length=10000)
@@ -128,6 +150,11 @@ def tasks(
     status: str = "",
     project_id: str = "",
     overdue: bool = False,
+    context: str = "",
+    priority: str = "",
+    tag: str = "",
+    due_from: date | None = None,
+    due_to: date | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -140,10 +167,27 @@ def tasks(
         filters.append(Task.status == status)
     if project_id:
         filters.append(Task.project_id == project_id)
+    if context:
+        filters.append(Task.context == context)
+    if priority:
+        filters.append(Task.priority == priority)
+    if due_from:
+        filters.append(Task.due_date >= due_from)
+    if due_to:
+        filters.append(Task.due_date <= due_to)
+    if tag:
+        import json
+        from sqlalchemy import String, cast
+
+        filters.append(
+            cast(Task.tags, String).contains(
+                json.dumps(tag.strip().lower()), autoescape=True
+            )
+        )
     if overdue:
         filters.extend(
             [
-                Task.due_date < datetime.now(ZoneInfo("America/Sao_Paulo")).date(),
+                Task.due_date < datetime.now(user_zone(db, user)).date(),
                 Task.status != "completed",
             ]
         )
@@ -153,6 +197,12 @@ def tasks(
 def save_task(db, user, data, row=None):
     if data.project_id:
         owned(db, Project, data.project_id, user)
+    if data.goal_id:
+        goal = owned(db, Goal, data.goal_id, user)
+        if goal.metric != "tasks":
+            raise HTTPException(
+                422, "Vincule tarefas a uma meta calculada por tarefas."
+            )
     # Serialize status transitions so simultaneous completion requests do not duplicate history.
     if row:
         row = db.scalar(
@@ -180,6 +230,18 @@ def save_task(db, user, data, row=None):
                 occurred_at=row.completed_at,
             )
         )
+        for notice in db.scalars(
+            select(Notification).where(
+                Notification.owner_id == user.id, Notification.read.is_(False)
+            )
+        ):
+            if (
+                notice.target
+                and notice.target.get("kind") == "task"
+                and notice.target.get("id") == row.id
+            ):
+                notice.read = True
+        generate_next(db, user, row)
     elif data.status != "completed":
         row.completed_at = None
     db.commit()
@@ -191,6 +253,13 @@ def create_task(
     data: TaskInput, db: Session = Depends(get_db), user: User = Depends(current_user)
 ):
     return save_task(db, user, data)
+
+
+@router.get("/tasks/{identity}")
+def read_task(
+    identity: str, db: Session = Depends(get_db), user: User = Depends(current_user)
+):
+    return dump(owned(db, Task, identity, user))
 
 
 @router.put("/tasks/{identity}")
@@ -260,7 +329,7 @@ def update_activity(
 
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    today = datetime.now(user_zone(db, user)).date()
 
     def count(model, *where):
         return db.scalar(

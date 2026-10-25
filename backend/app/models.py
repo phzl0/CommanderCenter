@@ -13,6 +13,8 @@ from sqlalchemy import (
     Integer,
     Boolean,
     BigInteger,
+    LargeBinary,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.db import Base
@@ -37,6 +39,10 @@ class User(Base):
 
 
 class SessionToken(Base):
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=now, server_default=text("CURRENT_TIMESTAMP")
+    )
+    device: Mapped[str] = mapped_column(String(180), default="", server_default="")
     __tablename__ = "sessions"
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(
@@ -64,6 +70,13 @@ class Project(Owned, Base):
 
 
 class Task(Owned, Base):
+    goal_id: Mapped[str | None] = mapped_column(ForeignKey("goals.id"), index=True)
+    tags: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    recurrence: Mapped[str] = mapped_column(
+        String(12), default="none", server_default="none"
+    )
+    recurrence_parent_id: Mapped[str | None] = mapped_column(String(36), unique=True)
+
     __tablename__ = "tasks"
     __table_args__ = (
         UniqueConstraint("id", "owner_id"),
@@ -163,6 +176,7 @@ class DashboardWidget(Owned, Base):
 
 
 class PersonalEntry(Owned, Base):
+    goal_id: Mapped[str | None] = mapped_column(ForeignKey("goals.id"), index=True)
     __tablename__ = "personal_entries"
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     label: Mapped[str] = mapped_column(String(100))
@@ -204,6 +218,7 @@ class NewsSource(Owned, Base):
 
 
 class Notification(Owned, Base):
+    target: Mapped[dict | None] = mapped_column(JSON)
     __tablename__ = "notifications"
     title: Mapped[str] = mapped_column(String(160))
     message: Mapped[str] = mapped_column(String(500), default="")
@@ -229,6 +244,8 @@ class ArticleState(Owned, Base):
 
 
 class IntegrationConnection(Owned, Base):
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(String(300))
     __tablename__ = "integration_connections"
     __table_args__ = (UniqueConstraint("owner_id", "provider"),)
     provider: Mapped[str] = mapped_column(String(20))
@@ -264,3 +281,42 @@ class InboxCapture(Owned, Base):
     context: Mapped[str] = mapped_column(String(16), default="general")
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     task_id: Mapped[str | None] = mapped_column(String(36))
+
+
+class AccountSettings(Base):
+    __tablename__ = "account_settings"
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    bio: Mapped[str] = mapped_column(String(500), default="")
+    occupation: Mapped[str] = mapped_column(String(100), default="")
+    interests: Mapped[str] = mapped_column(String(300), default="")
+    avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
+    avatar_version: Mapped[int] = mapped_column(Integer, default=0)
+    homepage: Mapped[str] = mapped_column(String(20), default="dashboard")
+    timezone: Mapped[str] = mapped_column(String(64), default="America/Sao_Paulo")
+    font_size: Mapped[str] = mapped_column(String(12), default="normal")
+    reduce_motion: Mapped[bool] = mapped_column(Boolean, default=False)
+    notify_success: Mapped[bool] = mapped_column(Boolean, default=True)
+    deadline_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    alert_days: Mapped[int] = mapped_column(Integer, default=1)
+    daily_capacity: Mapped[int] = mapped_column(Integer, default=480)
+
+
+class Goal(Owned, Base):
+    __tablename__ = "goals"
+    title: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text, default="")
+    context: Mapped[str] = mapped_column(String(16), default="personal")
+    metric: Mapped[str] = mapped_column(String(12), default="tasks")
+    target: Mapped[int] = mapped_column(Integer)
+    manual_value: Mapped[int] = mapped_column(Integer, default=0)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(12), default="active")
+
+
+class Appointment(Owned, Base):
+    __tablename__ = "appointments"
+    title: Mapped[str] = mapped_column(String(160))
+    notes: Mapped[str] = mapped_column(Text, default="")
+    start_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    end_at: Mapped[datetime] = mapped_column(DateTime)
+    context: Mapped[str] = mapped_column(String(16), default="personal")

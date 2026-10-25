@@ -9,6 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
+from app.core.preferences import user_zone
 from app.models import User, Task, PersonalEntry, DailyPlan, InboxCapture, now
 from app.modules.management import StrictModel, dump, owned
 
@@ -16,12 +17,12 @@ router = APIRouter(prefix="/api/day", tags=["Meu dia"])
 ZONE = ZoneInfo("America/Sao_Paulo")
 
 
-def today():
-    return datetime.now(ZONE).date()
+def today(db=None, user=None):
+    return datetime.now(user_zone(db, user) if db is not None else ZONE).date()
 
 
-def chosen(day):
-    value = day or today()
+def chosen(day, db=None, user=None):
+    value = day or today(db, user)
     if not 2000 <= value.year <= 2100:
         raise HTTPException(422, "Escolha uma data entre 2000 e 2100.")
     return value
@@ -80,20 +81,21 @@ def read(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    day = chosen(day)
+    day = chosen(day, db, user)
+    zone = user_zone(db, user)
     plan = plan_for(db, user, day)
     start = (
-        datetime.combine(day - timedelta(days=6), time.min, ZONE)
+        datetime.combine(day - timedelta(days=6), time.min, zone)
         .astimezone(timezone.utc)
         .replace(tzinfo=None)
     )
     end = (
-        datetime.combine(day + timedelta(days=1), time.min, ZONE)
+        datetime.combine(day + timedelta(days=1), time.min, zone)
         .astimezone(timezone.utc)
         .replace(tzinfo=None)
     )
     day_start = (
-        datetime.combine(day, time.min, ZONE)
+        datetime.combine(day, time.min, zone)
         .astimezone(timezone.utc)
         .replace(tzinfo=None)
     )
@@ -175,7 +177,7 @@ def read(
 def save(
     data: PlanInput, db: Session = Depends(get_db), user: User = Depends(current_user)
 ):
-    day = chosen(data.day)
+    day = chosen(data.day, db, user)
     if len(set(data.priority_ids)) != len(data.priority_ids):
         raise HTTPException(422, "Escolha tarefas diferentes para as três prioridades.")
     row = plan_for(db, user, day, True)
@@ -193,8 +195,8 @@ def save(
 def close(
     data: DayInput, db: Session = Depends(get_db), user: User = Depends(current_user)
 ):
-    day = chosen(data.day)
-    if day > today():
+    day = chosen(data.day, db, user)
+    if day > today(db, user):
         raise HTTPException(422, "O fechamento fica disponível no dia ou depois dele.")
     row = plan_for(db, user, day, True)
     if not row.closed_at:

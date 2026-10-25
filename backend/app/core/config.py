@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     alpha_vantage_api_key: str = ""
     github_client_id: str = ""
     github_client_secret: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
     microsoft_client_id: str = ""
     microsoft_client_secret: str = ""
     microsoft_tenant: str = "organizations"
