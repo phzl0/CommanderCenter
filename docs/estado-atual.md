@@ -6,7 +6,9 @@ MVP local com autenticação privada, isolamento por conta, tarefas, importaçã
 
 Há consultas públicas de GitHub, indicadores BCB, clima Open-Meteo e ações Alpha Vantage. O código OAuth para GitHub e Microsoft está pronto, com tokens criptografados e permissões de leitura. O card Microsoft consulta Planner/To Do. As conexões OAuth exigem cadastro dos aplicativos e configuração local; testes simulados não substituem a validação com as contas reais. Veja [conexões](connections.md).
 
-O tema usa fundo preto, superfícies cinza e cores por assunto: verde em atividade pessoal, violeta em tarefas, verde/coral em finanças, ciano em GitHub, âmbar em notícias/economia, pêssego em ações e rosa em análises. As legendas e rótulos continuam identificando as séries sem depender só de cor.
+O tema usa fundo azul muito escuro, superfícies azul-marinho e uma paleta próxima de azul e verde-claro. As legendas e rótulos continuam identificando as séries sem depender só de cor.
+
+A aba Meu dia inclui captura rápida, contexto pessoal/profissional, três prioridades, prazos locais, fechamento diário e revisão de sete dias. Consulte [Meu dia](meu-dia.md).
 
 ## Próximos passos práticos
 

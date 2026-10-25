@@ -217,7 +217,7 @@ function WidgetCard({
                   <span>
                     <i
                       style={{
-                        background: ["#5a9aff", "#9d8bff", "#40d7ba"][i],
+                        background: ["#86b4e8", "#789ac4", "#9cdbc1"][i],
                       }}
                     />
                     {s.name}

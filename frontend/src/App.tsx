@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Rss,
+  Sun,
 } from "lucide-react";
 import { api, send, type User } from "./api";
 import { Management } from "./Management";
@@ -18,12 +19,14 @@ import { DataLab } from "./DataLab";
 import { Reports } from "./Reports";
 import { notify } from "./feedback";
 import { NotificationBell } from "./Notifications";
+const MyDay = lazy(() => import("./MyDay"));
 const Sources = lazy(() => import("./Sources"));
 const WidgetDetails = lazy(() => import("./WidgetDetails"));
 const Intelligence = lazy(() => import("./Intelligence"));
-type Tab = "dashboard" | "tasks" | "imports" | "reports" | "sources";
+type Tab = "dashboard" | "tasks" | "imports" | "reports" | "sources" | "daily";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
+  { id: "daily", label: "Meu dia", icon: Sun },
   { id: "tasks", label: "Tarefas", icon: ListTodo },
   { id: "imports", label: "Dados e análises", icon: FileSpreadsheet },
   { id: "reports", label: "Relatórios", icon: Files },
@@ -298,6 +301,12 @@ export default function App() {
                 onBack={() => go("dashboard")}
                 onSources={() => go("sources")}
               />
+            </Suspense>
+          ) : tab === "daily" ? (
+            <Suspense
+              fallback={<div className="empty">Preparando seu dia…</div>}
+            >
+              <MyDay onTasks={() => go("tasks")} />
             </Suspense>
           ) : tab === "sources" ? (
             <Suspense

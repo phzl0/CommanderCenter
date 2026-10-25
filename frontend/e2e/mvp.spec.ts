@@ -188,7 +188,13 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.route("**/api/integrations", (route) =>
     route.fulfill({
       json: {
-        github: { configured: true, connected: true, account: "conta-teste" },
+        github: {
+          configured: true,
+          connected: true,
+          account: "conta-teste",
+          callback_url:
+            "http://localhost:5173/api/integrations/github/callback",
+        },
         microsoft: {
           configured: true,
           connected: true,
@@ -662,6 +668,56 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(page.locator(".intelligence-card")).toHaveCount(4);
   await expect(page.locator(".chart-loading")).toHaveCount(0);
   await capture("dashboard-desktop");
+  await nav.getByRole("button", { name: "Meu dia", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Meu dia", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("O que você quer registrar?", { exact: true })
+    .fill("Organizar entregas de amanhã");
+  await page
+    .getByLabel("Tipo de captura", { exact: true })
+    .selectOption("task");
+  await page
+    .getByLabel("Contexto da captura", { exact: true })
+    .selectOption("professional");
+  await page.getByRole("button", { name: "Capturar", exact: true }).click();
+  const captureRow = page
+    .locator(".capture-item")
+    .filter({ hasText: "Organizar entregas de amanhã" });
+  await captureRow
+    .getByRole("button", { name: "Virar tarefa", exact: true })
+    .click();
+  const taskRow = page
+    .locator(".day-agenda .day-task")
+    .filter({ hasText: "Organizar entregas de amanhã" });
+  await expect(taskRow).toContainText("Profissional");
+  await taskRow
+    .getByRole("button", {
+      name: "Priorizar: Organizar entregas de amanhã",
+      exact: true,
+    })
+    .click();
+  await page
+    .locator(".day-priorities")
+    .getByRole("button", {
+      name: "Concluir Organizar entregas de amanhã",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByLabel("Minha revisão", { exact: true })
+    .fill("Prioridade concluída. Próximo passo definido.");
+  await page.getByRole("button", { name: "Fechar dia", exact: true }).click();
+  await expect(page.locator(".review-result")).toContainText("1 de 1");
+  await capture("my-day-desktop");
+  await page.reload();
+  await nav.getByRole("button", { name: "Meu dia", exact: true }).click();
+  await expect(page.locator(".review-result")).toContainText("1 de 1");
+  await expect(page.getByLabel("Minha revisão", { exact: true })).toHaveValue(
+    "Prioridade concluída. Próximo passo definido.",
+  );
+  await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
@@ -670,5 +726,9 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     page.getByRole("button", { name: "Personalizar", exact: true }),
   ).toBeVisible();
   await capture("dashboard-mobile");
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+  await nav.getByRole("button", { name: "Meu dia", exact: true }).click();
+  await expect(page.locator(".review-result")).toContainText("1 de 1");
+  await capture("my-day-mobile");
   expect(errors).toEqual([]);
 });

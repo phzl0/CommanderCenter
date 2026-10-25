@@ -13,14 +13,14 @@ import {
 } from "recharts";
 import type { ChartData, Config, Kind } from "./intelligenceTypes";
 const palettes: Partial<Record<Kind, string[]>> = {
-  personal: ["#5be0ad"],
-  tasks: ["#b8a0ff"],
-  finance: ["#4ddfc1", "#ff909d"],
-  github: ["#6ed8f2"],
-  macro: ["#e9bd62"],
-  stock: ["#ffab86"],
-  analysis: ["#ed9bd3"],
-  teams: ["#c1a5ff"],
+  personal: ["#9cdbc1"],
+  tasks: ["#93b9ef"],
+  finance: ["#8ed7c1", "#8baed5"],
+  github: ["#9ac8ed"],
+  macro: ["#88b5ec"],
+  stock: ["#abd0ee"],
+  analysis: ["#92b3db"],
+  teams: ["#a0bdf0"],
 };
 const axisLabel = (s: unknown) =>
   typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
@@ -50,18 +50,18 @@ export default function WidgetChart({
   };
   const axes = (
     <>
-      <CartesianGrid stroke="#333333" strokeDasharray="3 5" vertical={false} />
+      <CartesianGrid stroke="#283c55" strokeDasharray="3 5" vertical={false} />
       <XAxis
         dataKey="label"
         tickFormatter={axisLabel}
-        tick={{ fill: "#b5b5b5", fontSize: 10 }}
+        tick={{ fill: "#a9bdd4", fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         minTickGap={24}
       />
       <YAxis
         width={43}
-        tick={{ fill: "#b5b5b5", fontSize: 10 }}
+        tick={{ fill: "#a9bdd4", fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         tickFormatter={(n) =>
@@ -73,8 +73,8 @@ export default function WidgetChart({
       />
       <Tooltip
         contentStyle={{
-          background: "#141414",
-          border: "1px solid #555555",
+          background: "#0e1b2e",
+          border: "1px solid #3d5673",
           borderRadius: 8,
           color: "#eeeeee",
           fontSize: 12,

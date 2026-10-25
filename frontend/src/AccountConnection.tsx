@@ -5,6 +5,7 @@ type State = {
   configured: boolean;
   connected: boolean;
   account: string | null;
+  callback_url?: string;
 };
 export default function AccountConnection({
   provider,
@@ -94,6 +95,35 @@ export default function AccountConnection({
           ? `Conectado: ${state.account}`
           : "Conecte sua conta para escolher o que acompanhar."}
       </p>
+      {state?.callback_url && (
+        <div className="connection-help">
+          <small>
+            Cadastre esta URL de retorno no aplicativo{" "}
+            {provider === "github"
+              ? "do GitHub (Authorization callback URL)"
+              : "da Microsoft (Redirect URI)"}
+            :
+          </small>
+          <input
+            aria-label="URL de retorno da conexão"
+            value={state.callback_url}
+            readOnly
+            onFocus={(e) => e.target.select()}
+          />
+          <small>
+            O Client ID e o Secret devem pertencer ao mesmo aplicativo.
+          </small>
+          {new URL(state.callback_url).origin !== window.location.origin && (
+            <p>
+              Para autorizar com a mesma sessão,{" "}
+              <a href={new URL(state.callback_url).origin}>
+                abra o endereço configurado
+              </a>{" "}
+              e entre novamente.
+            </p>
+          )}
+        </div>
+      )}
       <div className="connection-actions">
         {state?.connected ? (
           <>
@@ -168,6 +198,36 @@ export default function AccountConnection({
                 </button>
               ))}
           </div>
+          {state?.callback_url && (
+            <div className="connection-help">
+              <small>
+                Cadastre esta URL de retorno no aplicativo{" "}
+                {provider === "github"
+                  ? "do GitHub (Authorization callback URL)"
+                  : "da Microsoft (Redirect URI)"}
+                :
+              </small>
+              <input
+                aria-label="URL de retorno da conexão"
+                value={state.callback_url}
+                readOnly
+                onFocus={(e) => e.target.select()}
+              />
+              <small>
+                O Client ID e o Secret devem pertencer ao mesmo aplicativo.
+              </small>
+              {new URL(state.callback_url).origin !==
+                window.location.origin && (
+                <p>
+                  Para autorizar com a mesma sessão,{" "}
+                  <a href={new URL(state.callback_url).origin}>
+                    abra o endereço configurado
+                  </a>{" "}
+                  e entre novamente.
+                </p>
+              )}
+            </div>
+          )}
           <div className="connection-actions">
             <button
               type="button"

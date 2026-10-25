@@ -9,6 +9,7 @@ export type Project = {
   created_at: string;
 };
 export type Task = {
+  context: "personal" | "professional" | "general";
   id: string;
   title: string;
   description: string;
@@ -93,6 +94,10 @@ export async function api<T>(
         : method === "POST"
           ? "Registro adicionado"
           : "Alterações salvas";
+    if (path === "/day") title = "Planejamento salvo";
+    if (path === "/day/close") title = "Dia revisado";
+    if (path === "/day/reopen") title = "Revisão reaberta";
+    if (path === "/day/captures") title = "Captura registrada";
     if (path === "/intelligence/order") title = "Painéis reordenados";
     if (path === "/intelligence/settings") title = "Período atualizado";
     if (path === "/reports" && method === "POST") title = "Relatório gerado";

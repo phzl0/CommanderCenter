@@ -91,6 +91,7 @@ export function Management({ section }: { section: Section }) {
         description: f.get("description"),
         status: f.get("status"),
         priority: f.get("priority"),
+        context: f.get("context") || "general",
         project_id: f.get("project_id") || null,
         due_date: f.get("due_date") || null,
       };
@@ -118,14 +119,22 @@ export function Management({ section }: { section: Section }) {
     setBusy(true);
     setError("");
     try {
-      const { title, description, status, priority, project_id, due_date } =
-        task;
+      const {
+        title,
+        description,
+        status,
+        priority,
+        project_id,
+        due_date,
+        context,
+      } = task;
       await api(
         "/tasks/" + task.id,
         send("PUT", {
           title,
           description,
           status: status === "completed" ? "pending" : "completed",
+          context,
           priority,
           project_id,
           due_date,
@@ -380,6 +389,20 @@ export function Management({ section }: { section: Section }) {
                   defaultValue={row?.description}
                 />
               </label>
+              {section === "tasks" && (
+                <label>
+                  Contexto
+                  <select
+                    name="context"
+                    aria-label="Contexto"
+                    defaultValue={row?.context || "general"}
+                  >
+                    <option value="general">Sem contexto</option>
+                    <option value="personal">Pessoal</option>
+                    <option value="professional">Profissional</option>
+                  </select>
+                </label>
+              )}
               {section !== "projects" && (
                 <label>
                   Projeto

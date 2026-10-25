@@ -152,3 +152,7 @@ GitHub aceita link completo e seleção de repositórios públicos após conecta
 ## Tema de contraste e próximos passos
 
 Fundo preto, superfícies neutras e cores distintas por tipo de informação, com a mesma paleta nos gráficos da visão geral e dos detalhes. Consulte [o estado atual e as próximas etapas](docs/estado-atual.md) para distinguir recursos concluídos, ativação das conexões e evoluções futuras.
+
+## Meu dia e paleta harmônica
+
+Fundo azul muito escuro, tons próximos de azul/azul-marinho e verde-claro nos indicadores. A aba [Meu dia](docs/meu-dia.md) acrescenta captura rápida, contexto pessoal/profissional, até três prioridades, reagendamento, fechamento diário e revisão de sete dias. O guia de conexões inclui o diagnóstico de divergência de callback do GitHub; a URL de retorno também aparece na configuração do card.
