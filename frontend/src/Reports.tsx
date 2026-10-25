@@ -1,3 +1,4 @@
+import { confirmAction } from "./feedback";
 import { useEffect, useState } from "react";
 import { Plus, FileText, Download, Trash2 } from "lucide-react";
 import { api, send, download, timeLabel } from "./api";
@@ -56,7 +57,7 @@ export function Reports() {
     }
   }
   async function remove(r: Report) {
-    if (!window.confirm("Excluir este relatório e seu arquivo?")) return;
+    if (!(await confirmAction("Excluir este relatório e seu arquivo?"))) return;
     setBusy(true);
     try {
       await api("/reports/" + r.id, { method: "DELETE" });

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 test("private workspace: management, spreadsheet analysis and export", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // External panels use explicit test fixtures; no reliance on public quotas or live prices.
@@ -15,7 +16,66 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.route("**/api/intelligence/widgets/*/data?*", async (route) => {
     const id = new URL(route.request().url()).pathname.split("/")[4];
     const kind = externalIds.get(id);
-    if (kind === "news" || kind === "macro") {
+    if (kind === "news") {
+      await route.fulfill({
+        json: {
+          status: "ok",
+          source: "Fontes de teste",
+          as_of: new Date().toISOString(),
+          kpis: [{ label: "Notícias", value: 1 }],
+          items: [
+            {
+              title: "Manchete de demonstração",
+              url: "https://example.com/noticia",
+              date: "2026-10-24",
+              source: "Fonte de teste",
+              category: "Economia",
+              description:
+                "Resumo sintético para verificar a leitura no Command Center.",
+              image: "https://example.com/photo.png",
+            },
+          ],
+        },
+      });
+    } else if (kind === "weather") {
+      await route.fulfill({
+        json: {
+          status: "ok",
+          source: "Open-Meteo (fixture)",
+          kpis: [],
+          weather: {
+            city: "Campinas, São Paulo, Brasil",
+            temperature: 25,
+            feels_like: 26,
+            humidity: 60,
+            wind: 12,
+            code: 1,
+            condition: "Predominantemente limpo",
+            time: "2026-10-24T14:00",
+            timezone: "America/Sao_Paulo",
+            days: [
+              {
+                date: "2026-10-24",
+                min: 18,
+                max: 27,
+                code: 1,
+                condition: "Limpo",
+                rain: 10,
+              },
+            ],
+          },
+        },
+      });
+    } else if (kind === "stock") {
+      await route.fulfill({
+        json: {
+          status: "needs_config",
+          message: "Fixture sem cotações reais",
+          source: "Alpha Vantage",
+          kpis: [],
+        },
+      });
+    } else if (kind === "macro") {
       await route.fulfill({
         json: {
           status: "ok",
@@ -38,6 +98,50 @@ test("private workspace: management, spreadsheet analysis and export", async ({
         },
       });
     } else await route.continue();
+  });
+  await page.route("**/api/sources/image?*", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
+  await page.route("**/api/intelligence/city-search?*", (route) =>
+    route.fulfill({
+      json: [
+        {
+          label: "Campinas, São Paulo, Brasil",
+          latitude: -22.9,
+          longitude: -47.06,
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/intelligence/company-search?*", (route) =>
+    route.fulfill({
+      json: {
+        matches: [
+          {
+            symbol: "IBM",
+            name: "International Business Machines",
+            exchange: "United States",
+            currency: "USD",
+            verified: true,
+          },
+        ],
+        message: "Resultado sintético do teste",
+      },
+    }),
+  );
+  await page.route("**/api/intelligence/widgets", async (route) => {
+    const response = await route.fetch();
+    if (route.request().method() === "POST") {
+      const widget = await response.json();
+      externalIds.set(widget.id, widget.kind);
+    }
+    await route.fulfill({ response });
   });
   await page.goto("/");
   await page.getByLabel("E-mail", { exact: true }).fill("e2e@example.test");
@@ -222,6 +326,131 @@ test("private workspace: management, spreadsheet analysis and export", async ({
       .getByRole("region", { name: "Minha planilha", exact: true })
       .getByRole("img", { name: /Gráfico com/ }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Ver dados do gráfico", { exact: true }),
+  ).toHaveCount(0);
+  await personal
+    .getByRole("link", { name: "Ver detalhes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Dados do gráfico", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Dados do gráfico", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/detail-desktop.png",
+    fullPage: true,
+  });
+  await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
+  const news = page.getByRole("region", {
+    name: "Radar de notícias",
+    exact: true,
+  });
+  await expect(news.locator(".news-feed")).toBeVisible();
+  await expect(news.getByRole("img", { name: /Gráfico com/ })).toHaveCount(0);
+  await news
+    .getByRole("button", {
+      name: "Salvar notícia: Manchete de demonstração",
+      exact: true,
+    })
+    .click();
+  await news.getByRole("link", { name: "Ver detalhes", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Resumo sintético para verificar a leitura no Command Center.",
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Marcar como lida", exact: true })
+    .click();
+  await page.screenshot({
+    path: "test-results/news-detail.png",
+    fullPage: true,
+  });
+  await nav.getByRole("button", { name: "Fontes", exact: true }).click();
+  await expect(page.locator(".source-card")).toHaveCount(3);
+  const source = page.locator(".source-card").filter({
+    has: page.getByRole("heading", { name: "Agência Brasil", exact: true }),
+  });
+  await source.getByRole("switch").click();
+  await expect(source.getByRole("switch")).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  await source.getByRole("switch").click();
+  await source.getByRole("button", { name: "Remover", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Excluir", exact: true })
+    .click();
+  await expect(page.locator(".source-card")).toHaveCount(2);
+  await page
+    .locator(".toast-stack")
+    .getByRole("button", { name: "Desfazer", exact: true })
+    .click();
+  await expect(page.locator(".source-card")).toHaveCount(3);
+  await page.screenshot({
+    path: "test-results/sources-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Ler depois", exact: true }).click();
+  await expect(page.locator(".news-title")).toHaveText(
+    "Manchete de demonstração",
+  );
+  await page.getByRole("button", { name: "Já lidas", exact: true }).click();
+  await expect(page.locator(".news-title")).toHaveText(
+    "Manchete de demonstração",
+  );
+  await page.getByRole("button", { name: "Notificações", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Central de notificações" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Marcar todas como lidas", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Fechar notificações", exact: true })
+    .click();
+  await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Clima e previsão/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Cidade", { exact: true }).fill("Campinas");
+  await dialog
+    .getByRole("button", { name: "Buscar cidade", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Campinas, São Paulo, Brasil", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Ações de empresas/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Empresa, código ou link", { exact: true })
+    .fill("https://finance.yahoo.com/quote/IBM/");
+  await dialog
+    .getByRole("button", { name: "Buscar empresa", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: /IBM · International Business Machines/ })
+    .click();
+  await expect(
+    dialog.getByLabel("Código no provedor", { exact: true }),
+  ).toHaveValue("IBM");
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
   await expect(page.locator(".chart-loading")).toHaveCount(0);
   await page.screenshot({
     path: "test-results/dashboard-desktop.png",

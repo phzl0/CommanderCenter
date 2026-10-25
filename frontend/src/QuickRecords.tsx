@@ -1,3 +1,4 @@
+import { confirmAction } from "./feedback";
 import { useEffect, useState } from "react";
 import { X, Trash2, Pencil, Plus } from "lucide-react";
 import { api, send, dateLabel } from "./api";
@@ -42,6 +43,11 @@ export default function QuickRecords({
       live = false;
     };
   }, [kind, version]);
+  useEffect(() => {
+    const changed = () => setVersion((v) => v + 1);
+    window.addEventListener("cc-data-changed", changed);
+    return () => window.removeEventListener("cc-data-changed", changed);
+  }, []);
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -78,7 +84,11 @@ export default function QuickRecords({
     }
   }
   async function remove(entry: Entry) {
-    if (!window.confirm("Excluir este lançamento? O gráfico será recalculado."))
+    if (
+      !(await confirmAction(
+        "Excluir este lançamento? O gráfico será recalculado.",
+      ))
+    )
       return;
     setBusy(true);
     setError("");

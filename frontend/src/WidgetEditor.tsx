@@ -9,6 +9,15 @@ import {
   type Widget,
   type WidgetInput,
 } from "./intelligenceTypes";
+import type { Source } from "./Sources";
+type Company = {
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+  verified: boolean;
+};
+type City = { label: string; latitude: number; longitude: number };
 type Analysis = { id: string; name: string };
 export default function WidgetEditor({
   widget,
@@ -43,6 +52,60 @@ export default function WidgetEditor({
     [error, setError] = useState(""),
     [analyses, setAnalyses] = useState<Analysis[]>([]),
     [columns, setColumns] = useState<{ name: string; numeric: boolean }[]>([]);
+  const [sources, setSources] = useState<Source[]>([]),
+    [search, setSearch] = useState(""),
+    [matches, setMatches] = useState<Company[]>([]),
+    [cities, setCities] = useState<City[]>([]),
+    [searching, setSearching] = useState(false),
+    [searchNote, setSearchNote] = useState("");
+  useEffect(() => {
+    api<Source[]>("/sources/bootstrap", { method: "POST" })
+      .then((rows) => {
+        setSources(rows);
+        setForm((f) => ({
+          ...f,
+          config: {
+            ...f.config,
+            news_source_ids: f.config.news_source_ids.filter((id) =>
+              rows.some((s) => s.id === id),
+            ),
+          },
+        }));
+      })
+      .catch((e) => setError(e.message));
+  }, []);
+  async function searchCompany() {
+    setSearching(true);
+    setError("");
+    setMatches([]);
+    try {
+      const r = await api<{ matches: Company[]; message: string }>(
+        "/intelligence/company-search?q=" + encodeURIComponent(search),
+      );
+      setMatches(r.matches);
+      setSearchNote(r.message);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  }
+  async function searchCity() {
+    setSearching(true);
+    setError("");
+    setCities([]);
+    try {
+      setCities(
+        await api<City[]>(
+          "/intelligence/city-search?q=" + encodeURIComponent(search),
+        ),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  }
   useEffect(() => {
     api<Analysis[]>("/analyses")
       .then(setAnalyses)
@@ -137,20 +200,24 @@ export default function WidgetEditor({
                 ))}
               </select>
             </label>
-            <label>
-              Tipo de gráfico
-              <select
-                aria-label="Tipo de gráfico"
-                value={form.config.chart_type}
-                onChange={(e) =>
-                  config({ chart_type: e.target.value as Config["chart_type"] })
-                }
-              >
-                <option value="area">Área</option>
-                <option value="line">Linha</option>
-                <option value="bar">Barras</option>
-              </select>
-            </label>
+            {!["news", "weather"].includes(form.kind) && (
+              <label>
+                Tipo de gráfico
+                <select
+                  aria-label="Tipo de gráfico"
+                  value={form.config.chart_type}
+                  onChange={(e) =>
+                    config({
+                      chart_type: e.target.value as Config["chart_type"],
+                    })
+                  }
+                >
+                  <option value="area">Área</option>
+                  <option value="line">Linha</option>
+                  <option value="bar">Barras</option>
+                </select>
+              </label>
+            )}
           </div>
           {form.kind === "github" && (
             <label>
@@ -169,24 +236,73 @@ export default function WidgetEditor({
             </label>
           )}
           {form.kind === "news" && (
-            <label>
-              Fonte de notícias
-              <select
-                aria-label="Fonte de notícias"
-                value={form.config.feed}
-                onChange={(e) =>
-                  config({ feed: e.target.value as Config["feed"] })
-                }
-              >
-                <option value="ibge">IBGE · Economia e indicadores</option>
-                <option value="economia">Agência Brasil · Economia</option>
-                <option value="politica">Agência Brasil · Política</option>
-              </select>
+            <section className="news-widget-settings">
+              <h3>Fontes do radar</h3>
+              <p className="muted">
+                Sem seleção, usa até seis fontes ativas. Configure sites e
+                categorias na aba Fontes.
+              </p>
+              <div className="source-checkboxes">
+                {sources.map((source) => (
+                  <label className="checkbox-label" key={source.id}>
+                    <input
+                      type="checkbox"
+                      checked={form.config.news_source_ids.includes(source.id)}
+                      disabled={
+                        !form.config.news_source_ids.includes(source.id) &&
+                        form.config.news_source_ids.length >= 6
+                      }
+                      onChange={(e) =>
+                        config({
+                          news_source_ids: e.target.checked
+                            ? [...form.config.news_source_ids, source.id]
+                            : form.config.news_source_ids.filter(
+                                (id) => id !== source.id,
+                              ),
+                        })
+                      }
+                    />
+                    {source.name}
+                    <small>{source.category}</small>
+                  </label>
+                ))}
+              </div>
+              <label>
+                Categoria do radar
+                <select
+                  aria-label="Categoria do radar"
+                  value={form.config.news_category}
+                  onChange={(e) => config({ news_category: e.target.value })}
+                >
+                  <option value="">Todas as categorias</option>
+                  {[...new Set(sources.map((s) => s.category))].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Incluir palavras-chave
+                <input
+                  placeholder="empresa, time, jogo…"
+                  value={form.config.news_keywords}
+                  maxLength={300}
+                  onChange={(e) => config({ news_keywords: e.target.value })}
+                />
+              </label>
+              <label>
+                Excluir palavras-chave
+                <input
+                  placeholder="termos separados por vírgula"
+                  value={form.config.news_exclude}
+                  maxLength={300}
+                  onChange={(e) => config({ news_exclude: e.target.value })}
+                />
+              </label>
               <small className="muted">
-                A contagem representa apenas os itens recebidos do feed, sem
-                avaliação de sentimento.
+                Termos separados por vírgula. Basta um termo de inclusão;
+                qualquer termo de exclusão remove a notícia do recorte.
               </small>
-            </label>
+            </section>
           )}
           {form.kind === "macro" && (
             <label>
@@ -205,23 +321,129 @@ export default function WidgetEditor({
             </label>
           )}
           {form.kind === "stock" && (
-            <label>
-              Símbolo da empresa
-              <input
-                aria-label="Símbolo da empresa"
-                placeholder="IBM"
-                maxLength={30}
-                value={form.config.symbol}
-                onChange={(e) =>
-                  config({ symbol: e.target.value.toUpperCase().trim() })
-                }
-              />
+            <section className="stock-search">
+              <label>
+                Empresa, código ou link
+                <input
+                  aria-label="Empresa, código ou link"
+                  placeholder="Nome, sigla ou link Yahoo/Google/TradingView"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={searching || search.trim().length < 2}
+                onClick={searchCompany}
+              >
+                {searching ? "Pesquisando…" : "Buscar empresa"}
+              </button>
+              {searchNote && <p className="muted search-note">{searchNote}</p>}
+              <div className="search-results">
+                {matches.map((company) => (
+                  <button
+                    type="button"
+                    key={company.symbol}
+                    onClick={() => {
+                      config({
+                        symbol: company.symbol,
+                        stock_name: company.name,
+                        stock_exchange: company.exchange,
+                        stock_currency: company.currency,
+                      });
+                      setMatches([]);
+                      setSearchNote(
+                        "Listagem selecionada. Confira os dados antes de salvar.",
+                      );
+                    }}
+                  >
+                    <strong>
+                      {company.symbol} · {company.name}
+                    </strong>
+                    <small>
+                      {company.exchange} · {company.currency}
+                    </small>
+                  </button>
+                ))}
+              </div>
+              <label>
+                Código no provedor
+                <input
+                  aria-label="Código no provedor"
+                  value={form.config.symbol}
+                  maxLength={30}
+                  onChange={(e) =>
+                    config({
+                      symbol: e.target.value.toUpperCase().trim(),
+                      stock_name: "",
+                      stock_exchange: "",
+                      stock_currency: "",
+                    })
+                  }
+                />
+              </label>
+              {form.config.stock_name && (
+                <div className="selected-source">
+                  <strong>{form.config.stock_name}</strong>
+                  <span>
+                    {form.config.stock_exchange} · {form.config.stock_currency}
+                  </span>
+                </div>
+              )}
               <small className="muted">
-                Fechamentos diários via Alpha Vantage. Exige
-                ALPHA_VANTAGE_API_KEY no .env local e está sujeito ao limite do
-                provedor. Não insira a chave neste campo.
+                Provedor único: Alpha Vantage. Busca e fechamentos diários
+                exigem ALPHA_VANTAGE_API_KEY no .env local. Links são atalhos de
+                pesquisa; não importam cotações do site colado.
               </small>
-            </label>
+            </section>
+          )}
+          {form.kind === "weather" && (
+            <section>
+              <label>
+                Cidade
+                <input
+                  aria-label="Cidade"
+                  placeholder="São Paulo, Campinas…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={searching || search.trim().length < 2}
+                onClick={searchCity}
+              >
+                {searching ? "Pesquisando…" : "Buscar cidade"}
+              </button>
+              <div className="search-results">
+                {cities.map((city) => (
+                  <button
+                    type="button"
+                    key={city.label + city.latitude}
+                    onClick={() => {
+                      config({
+                        city: city.label,
+                        latitude: city.latitude,
+                        longitude: city.longitude,
+                      });
+                      setCities([]);
+                    }}
+                  >
+                    {city.label}
+                  </button>
+                ))}
+              </div>
+              {form.config.city && (
+                <div className="selected-source">
+                  <strong>{form.config.city}</strong>
+                  <span>Cidade selecionada</span>
+                </div>
+              )}
+              <small className="muted">
+                Condições e previsão via Open-Meteo. Nenhuma localização do
+                navegador é solicitada.
+              </small>
+            </section>
           )}
           {form.kind === "personal" && (
             <label>

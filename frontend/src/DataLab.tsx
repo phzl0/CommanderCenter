@@ -1,3 +1,4 @@
+import { confirmAction } from "./feedback";
 import { useEffect, useState } from "react";
 import {
   Upload,
@@ -266,9 +267,9 @@ export function DataLab() {
   }
   async function remove(item: ImportItem) {
     if (
-      !window.confirm(
+      !(await confirmAction(
         "Excluir o original, suas análises e os relatórios relacionados? Esta ação não pode ser desfeita.",
-      )
+      ))
     )
       return;
     setBusy(true);

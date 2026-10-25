@@ -6,7 +6,8 @@ export type Kind =
   | "news"
   | "macro"
   | "stock"
-  | "analysis";
+  | "analysis"
+  | "weather";
 export type Config = {
   chart_type: "area" | "line" | "bar";
   repository: string;
@@ -18,6 +19,16 @@ export type Config = {
   y_column: string;
   aggregation: "sum" | "mean" | "count";
   metric: "minutes" | "events";
+  news_source_ids: string[];
+  news_category: string;
+  news_keywords: string;
+  news_exclude: string;
+  stock_name: string;
+  stock_exchange: string;
+  stock_currency: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 export type Widget = {
   id: string;
@@ -43,7 +54,27 @@ export type ChartData = {
   };
   kpis?: { label: string; value: number | null; unit?: string }[];
   distribution?: { name: string; value: number }[];
-  items?: { title: string; url: string; date: string }[];
+  items?: import("./NewsFeed").NewsItem[];
+  source_errors?: { source: string; message: string }[];
+  suggestions?: string[];
+  city?: string;
+  weather?: {
+    temperature: number | null;
+    feels_like: number | null;
+    code: number | null;
+    condition: string;
+    wind: number | null;
+    time: string;
+    timezone: string;
+    days: {
+      date: string;
+      code: number;
+      condition: string;
+      max: number;
+      min: number;
+      rain: number | null;
+    }[];
+  };
   link?: string;
 };
 export const initialConfig: Config = {
@@ -57,6 +88,16 @@ export const initialConfig: Config = {
   y_column: "",
   aggregation: "sum",
   metric: "minutes",
+  news_source_ids: [],
+  news_category: "",
+  news_keywords: "",
+  news_exclude: "",
+  stock_name: "",
+  stock_exchange: "",
+  stock_currency: "",
+  city: "",
+  latitude: null,
+  longitude: null,
 };
 export const catalogue: {
   kind: Kind;
@@ -91,8 +132,8 @@ export const catalogue: {
   {
     kind: "news",
     name: "Radar de notícias",
-    description: "Manchetes e volume recebido de economia e política.",
-    tag: "IBGE / Agência Brasil",
+    description: "Manchetes, imagens e leitura organizada por tema.",
+    tag: "Suas fontes de notícias",
   },
   {
     kind: "macro",
@@ -111,6 +152,12 @@ export const catalogue: {
     name: "Gráfico de planilha",
     description: "Transforme uma análise salva em um painel.",
     tag: "Seus arquivos",
+  },
+  {
+    kind: "weather",
+    name: "Clima e previsão",
+    description: "Condições atuais e previsão de sete dias para sua cidade.",
+    tag: "Open-Meteo",
   },
 ];
 export const formatValue = (n: number | null, unit = "") =>

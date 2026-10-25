@@ -1,3 +1,4 @@
+import { confirmAction, detailUrl } from "./feedback";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -24,6 +25,7 @@ import {
   X,
   AlertCircle,
   Database,
+  CloudSun,
 } from "lucide-react";
 import { api, send, type User } from "./api";
 import {
@@ -37,6 +39,8 @@ import {
 import WidgetChart from "./WidgetChart";
 import WidgetEditor from "./WidgetEditor";
 import QuickRecords from "./QuickRecords";
+import NewsFeed from "./NewsFeed";
+import WeatherView from "./WeatherView";
 const icons = {
   tasks: Check,
   personal: Activity,
@@ -46,6 +50,7 @@ const icons = {
   macro: Gauge,
   stock: TrendingUp,
   analysis: BarChart3,
+  weather: CloudSun,
 };
 function WidgetCard({
   widget,
@@ -150,7 +155,11 @@ function WidgetCard({
               ))}
             </div>
           )}
-          {hasData && hasPoints && data.chart ? (
+          {widget.kind === "news" && hasData && data?.items?.length ? (
+            <NewsFeed items={data.items} compact />
+          ) : widget.kind === "weather" && hasData && data?.weather ? (
+            <WeatherView weather={data.weather} city={data.city} />
+          ) : widget.kind !== "news" && hasData && hasPoints && data.chart ? (
             <WidgetChart
               data={data.chart}
               type={widget.config.chart_type}
@@ -209,54 +218,6 @@ function WidgetCard({
               ))}
             </div>
           )}
-          {data?.items && data.items.length > 0 && (
-            <div className="headline-list">
-              {data.items.map((n, i) => (
-                <a
-                  key={n.url + "-" + i}
-                  href={n.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span className="headline-index">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <strong>{n.title}</strong>
-                    <small>{n.date || "Data não informada"}</small>
-                  </div>
-                  <ArrowUpRight size={14} />
-                </a>
-              ))}
-            </div>
-          )}
-          {hasData && data?.chart && (
-            <details className="chart-data-table">
-              <summary>Ver dados do gráfico</summary>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Data / categoria</th>
-                      {data.chart.series.map((s) => (
-                        <th key={s.key}>{s.name}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.chart.points.slice(0, 100).map((point, i) => (
-                      <tr key={i}>
-                        <td>{point.label}</td>
-                        {data.chart!.series.map((s) => (
-                          <td key={s.key}>{String(point[s.key] ?? "—")}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          )}
           <div className="widget-provenance">
             <span>
               <i className={hasData ? "live-dot" : "idle-dot"} />
@@ -292,6 +253,19 @@ function WidgetCard({
             )}
         </>
       )}
+      <div className="card-detail-actions">
+        <a href={detailUrl(widget.id)}>
+          Ver detalhes <ChevronRight size={14} />
+        </a>
+        <a
+          href={detailUrl(widget.id)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={"Abrir em nova aba: " + widget.title}
+        >
+          <ArrowUpRight size={15} />
+        </a>
+      </div>
     </section>
   );
 }
@@ -322,9 +296,18 @@ export default function Intelligence({ user }: { user: User }) {
       setLoaded(true);
     });
   }, []);
+  useEffect(() => {
+    const changed = () => {
+      load()
+        .then(() => setVersion((v) => v + 1))
+        .catch((e) => setError(e.message));
+    };
+    window.addEventListener("cc-data-changed", changed);
+    return () => window.removeEventListener("cc-data-changed", changed);
+  }, []);
   const visible = widgets.filter((w) => w.visible),
     publicSources = visible.filter((w) =>
-      ["github", "news", "macro", "stock"].includes(w.kind),
+      ["github", "news", "macro", "stock", "weather"].includes(w.kind),
     ).length;
   async function saveWidget(w: Widget, patch: Partial<WidgetInput>) {
     setBusy(true);
@@ -360,9 +343,9 @@ export default function Intelligence({ user }: { user: User }) {
   }
   async function remove(w: Widget) {
     if (
-      !window.confirm(
+      !(await confirmAction(
         "Remover este painel? Seus registros e arquivos serão mantidos.",
-      )
+      ))
     )
       return;
     setBusy(true);

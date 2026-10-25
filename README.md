@@ -129,7 +129,7 @@ Veja [docs/verificacao.md](docs/verificacao.md), [docs/arquitetura.md](docs/arqu
 
 O volume `postgres_data` contém o banco e `private_storage` contém os arquivos. Código e migrações ficam no Git; dados e `.env` não. Commit não é backup dos seus dados. Consulte [docs/backup.md](docs/backup.md) para salvar e restaurar ambos.
 
-Deploy, integrações, notícias, LangGraph e automações ficam para etapas futuras. Esta configuração é destinada ao uso local; não foi preparada para exposição pública.
+Deploy, integrações adicionais, LangGraph e automações ficam para etapas futuras. Esta configuração é destinada ao uso local; não foi preparada para exposição pública.
 
 ### Teste por navegador
 
@@ -138,3 +138,7 @@ O job `compose-e2e` constrói e inicia os três serviços em um runner descartá
 ## Visão geral configurável (0.2)
 
 Novo tema escuro azul, gráficos de área/linha/barras e painéis escolhidos por usuário. Projetos e Atividades saíram do menu; os dados existentes são mantidos. Inclui registro rápido pessoal/financeiro, painéis de tarefas, GitHub público, notícias, BCB, ações via chave opcional e análises salvas. Consulte [o guia do centro de informações](docs/intelligence-workspace.md) para fontes, limitações e atualização sem perder seus dados.
+
+## Fontes e leitura (0.3)
+
+Radar com manchetes e imagens, três fontes iniciais e RSS personalizados por categoria. Favoritos e histórico de leitura privados, detalhes por card com tabelas fora da página inicial, notificações internas e opção de desfazer exclusões compatíveis. Busca de empresas por nome/código/link (Alpha Vantage, chave opcional) e clima por cidade (Open-Meteo). Veja [o guia das fontes e detalhes](docs/sources-and-details.md) para uso, limites e atualização local.

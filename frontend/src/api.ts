@@ -1,3 +1,4 @@
+import { notify, type UndoAction } from "./feedback";
 export type User = { id: string; name: string; email: string };
 export type Project = {
   id: string;
@@ -73,9 +74,58 @@ export async function api<T>(
     } catch {
       /* Server may return non-JSON errors. */
     }
+    if (!path.startsWith("/notifications") && path !== "/auth/me")
+      notify({ title: message, level: "error" });
     throw new Error(message);
   }
-  return res.status === 204 ? (undefined as T) : res.json();
+  const result = res.status === 204 ? undefined : await res.json();
+  const method = (options.method || "GET").toUpperCase();
+  const silent =
+    path.startsWith("/auth") ||
+    path.startsWith("/notifications") ||
+    path.endsWith("/bootstrap") ||
+    path === "/sources/preview" ||
+    path === "/sources/articles/state";
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !silent) {
+    let title =
+      method === "DELETE"
+        ? "Registro excluído"
+        : method === "POST"
+          ? "Registro adicionado"
+          : "Alterações salvas";
+    if (path === "/intelligence/order") title = "Painéis reordenados";
+    if (path === "/intelligence/settings") title = "Período atualizado";
+    if (path === "/reports" && method === "POST") title = "Relatório gerado";
+    if (path.endsWith("/analyze")) title = "Análise atualizada";
+    let action: UndoAction | undefined;
+    const widget = path.match(/^\/intelligence\/widgets\/([^/]+)$/),
+      entry = path.match(
+        /^\/intelligence\/entries\/(personal|finance)\/([^/]+)$/,
+      ),
+      source = path.match(/^\/sources\/([^/]+)$/);
+    if (method === "DELETE") {
+      if (widget) action = { kind: "widget", id: widget[1] };
+      if (entry)
+        action = { kind: entry[1] as "personal" | "finance", id: entry[2] };
+      if (source) action = { kind: "source", id: source[1] };
+    }
+    const notice = { title, level: "success" as const, action };
+    notify(notice);
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(notice),
+      });
+    } catch {
+      /* A toast still confirms the completed mutation if the inbox is unavailable. */
+    }
+    window.dispatchEvent(new Event("cc-notifications-changed"));
+  }
+  if (result?.status === "unavailable" || result?.source_errors?.length)
+    window.dispatchEvent(new Event("cc-notifications-changed"));
+  return result as T;
 }
 export const send = (method: string, data: unknown): RequestInit => ({
   method,

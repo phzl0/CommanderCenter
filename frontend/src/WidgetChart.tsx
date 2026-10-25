@@ -20,10 +20,12 @@ export default function WidgetChart({
   data,
   type,
   id,
+  height = 205,
 }: {
   data: NonNullable<ChartData["chart"]>;
   type: Config["chart_type"];
   id: string;
+  height?: number;
 }) {
   const common = {
     data: data.points,
@@ -75,7 +77,7 @@ export default function WidgetChart({
       role="img"
       aria-label={`Gráfico com ${data.points.length} pontos. Séries: ${data.series.map((s) => s.name).join(", ")}.`}
     >
-      <ResponsiveContainer width="100%" height={205} minWidth={0}>
+      <ResponsiveContainer width="100%" height={height} minWidth={0}>
         {type === "bar" ? (
           <BarChart {...common}>
             {axes}

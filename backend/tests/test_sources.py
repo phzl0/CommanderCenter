@@ -289,3 +289,44 @@ def test_company_link_search_and_weather(client, monkeypatch):
     assert (
         weather["weather"]["temperature"] == 26 and len(weather["weather"]["days"]) == 1
     )
+
+
+def test_image_proxy_only_valid_images(client, monkeypatch):
+    import io
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2), "blue").save(buffer, format="PNG")
+    monkeypatch.setattr(
+        newsroom,
+        "public_fetch",
+        lambda *a, **kw: (buffer.getvalue(), "text/plain", a[0]),
+    )
+    response = client.get(
+        "/api/sources/image", params={"url": "https://example.com/photo.png"}
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"].startswith("private")
+    monkeypatch.setattr(
+        newsroom,
+        "public_fetch",
+        lambda *a, **kw: (
+            b'<svg xmlns="http://www.w3.org/2000/svg"/>',
+            "image/svg+xml",
+            a[0],
+        ),
+    )
+    assert (
+        client.get(
+            "/api/sources/image", params={"url": "https://example.com/photo.svg"}
+        ).status_code
+        == 422
+    )
+    client.post("/api/auth/logout")
+    assert (
+        client.get(
+            "/api/sources/image", params={"url": "https://example.com/photo.png"}
+        ).status_code
+        == 401
+    )

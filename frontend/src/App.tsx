@@ -10,18 +10,23 @@ import {
   Menu,
   ChevronRight,
   ShieldCheck,
+  Rss,
 } from "lucide-react";
 import { api, send, type User } from "./api";
 import { Management } from "./Management";
 import { DataLab } from "./DataLab";
 import { Reports } from "./Reports";
+import { NotificationBell } from "./Notifications";
+const Sources = lazy(() => import("./Sources"));
+const WidgetDetails = lazy(() => import("./WidgetDetails"));
 const Intelligence = lazy(() => import("./Intelligence"));
-type Tab = "dashboard" | "tasks" | "imports" | "reports";
+type Tab = "dashboard" | "tasks" | "imports" | "reports" | "sources";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
   { id: "tasks", label: "Tarefas", icon: ListTodo },
   { id: "imports", label: "Dados e análises", icon: FileSpreadsheet },
   { id: "reports", label: "Relatórios", icon: Files },
+  { id: "sources", label: "Fontes", icon: Rss },
 ] as const;
 export default function App() {
   const [user, setUser] = useState<User | null>(null),
@@ -30,6 +35,20 @@ export default function App() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [menu, setMenu] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(
+    () =>
+      window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,
+  );
+  useEffect(() => {
+    const changed = () => {
+      setDetailId(
+        window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,
+      );
+      setTab("dashboard");
+    };
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, []);
   useEffect(() => {
     api<User>("/auth/me")
       .then(setUser)
@@ -150,6 +169,13 @@ export default function App() {
       </main>
     );
   const go = (t: Tab) => {
+    if (window.location.hash)
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    setDetailId(null);
     setTab(t);
     setMenu(false);
     setError("");
@@ -223,11 +249,18 @@ export default function App() {
             </button>
             <span>Meu centro</span>
             <ChevronRight size={14} />
-            <strong>{nav.find((n) => n.id === tab)?.label}</strong>
+            <strong>
+              {detailId
+                ? "Detalhes do painel"
+                : nav.find((n) => n.id === tab)?.label}
+            </strong>
           </div>
-          <span className="local-badge">
-            <i /> Ambiente local
-          </span>
+          <div className="topbar-tools">
+            <NotificationBell />
+            <span className="local-badge">
+              <i /> Ambiente local
+            </span>
+          </div>
         </header>
         <main className="content">
           {error && (
@@ -235,7 +268,24 @@ export default function App() {
               {error}
             </div>
           )}
-          {tab === "dashboard" ? (
+          {detailId ? (
+            <Suspense
+              fallback={<div className="empty">Carregando detalhes…</div>}
+            >
+              <WidgetDetails
+                key={detailId}
+                id={detailId}
+                onBack={() => go("dashboard")}
+                onSources={() => go("sources")}
+              />
+            </Suspense>
+          ) : tab === "sources" ? (
+            <Suspense
+              fallback={<div className="empty">Carregando fontes…</div>}
+            >
+              <Sources />
+            </Suspense>
+          ) : tab === "dashboard" ? (
             <Suspense
               fallback={
                 <div className="empty">

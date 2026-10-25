@@ -1,5 +1,12 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { NotificationHub } from "./Notifications";
 import "./styles.css";
 import "./dark.css";
-createRoot(document.getElementById("root")!).render(<App />);
+import "./reading.css";
+createRoot(document.getElementById("root")!).render(
+  <>
+    <App />
+    <NotificationHub />
+  </>,
+);
