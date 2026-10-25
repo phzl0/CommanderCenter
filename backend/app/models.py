@@ -142,6 +142,7 @@ class WorkspaceSettings(Base):
     __tablename__ = "workspace_settings"
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     days: Mapped[int] = mapped_column(Integer, default=30)
+    card_limit: Mapped[int] = mapped_column(Integer, default=4, server_default="4")
 
 
 class DashboardWidget(Owned, Base):
@@ -222,3 +223,22 @@ class ArticleState(Owned, Base):
     published_date: Mapped[str] = mapped_column(String(40), default="")
     bookmarked: Mapped[bool] = mapped_column(Boolean, default=False)
     read_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class IntegrationConnection(Owned, Base):
+    __tablename__ = "integration_connections"
+    __table_args__ = (UniqueConstraint("owner_id", "provider"),)
+    provider: Mapped[str] = mapped_column(String(20))
+    account: Mapped[str] = mapped_column(String(200))
+    credentials: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class IntegrationFlow(Base):
+    __tablename__ = "integration_flows"
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    session_hash: Mapped[str] = mapped_column(String(64))
+    provider: Mapped[str] = mapped_column(String(20))
+    verifier: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)

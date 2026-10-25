@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     storage_dir: Path = Path("storage")
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     alpha_vantage_api_key: str = ""
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_tenant: str = "organizations"
+    integration_origin: str = "http://localhost:5173"
     cookie_secure: bool = False
     session_hours: int = 12
     max_upload_mb: int = 10

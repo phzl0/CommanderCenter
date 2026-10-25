@@ -9,7 +9,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.core.db import get_db
@@ -29,7 +29,7 @@ from app.models import (
 from app.modules.management import StrictModel, owned, dump
 from app.modules.files import read_import
 from app.modules.data_service import AnalysisConfig, analyze, records
-from app.modules import providers, newsroom
+from app.modules import providers, newsroom, integrations
 from app.modules.notifications import record
 
 router = APIRouter(prefix="/api/intelligence", tags=["Centro de informações"])
@@ -43,10 +43,36 @@ KINDS = [
     "stock",
     "analysis",
     "weather",
+    "teams",
 ]
 
 
 class WidgetConfig(StrictModel):
+    @field_validator("repository", mode="before")
+    @classmethod
+    def repository_link(cls, value):
+        from urllib.parse import urlparse
+
+        value = str(value or "").strip()
+        if "://" in value:
+            parsed = urlparse(value)
+            if (
+                parsed.scheme != "https"
+                or parsed.hostname not in ("github.com", "www.github.com")
+                or parsed.username
+                or parsed.port not in (None, 443)
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError("Use um link HTTPS do GitHub ou dono/repositório.")
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) != 2:
+                raise ValueError("Cole o link principal do repositório.")
+            value = "/".join(parts)
+        return value.removesuffix(".git")
+
+    task_source: Literal["planner", "todo"] = "planner"
+    task_list_id: str = Field(default="", max_length=200, pattern=r"^[A-Za-z0-9_=.-]*$")
     chart_type: Literal["area", "line", "bar"] = "area"
     repository: str = Field(
         default="",
@@ -85,6 +111,7 @@ class WidgetInput(StrictModel):
         "stock",
         "analysis",
         "weather",
+        "teams",
     ]
     visible: bool = True
     wide: bool = False
@@ -92,7 +119,8 @@ class WidgetInput(StrictModel):
 
 
 class PeriodInput(StrictModel):
-    days: Literal[7, 30, 90] = 30
+    days: Literal[7, 30, 90] | None = None
+    card_limit: int | None = Field(default=None, ge=1, le=12)
 
 
 class OrderInput(StrictModel):
@@ -151,10 +179,10 @@ def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user))
         defaults = [
             ("Evolução das tarefas", "tasks", {"chart_type": "bar"}),
             ("Minha atividade pessoal", "personal", {}),
-            ("Fluxo financeiro", "finance", {}),
+            ("Radar de notícias", "news", {}),
             ("Desenvolvimento no GitHub", "github", {}),
+            ("Fluxo financeiro", "finance", {}),
             ("Dólar comercial", "macro", {}),
-            ("Radar de notícias", "news", {"chart_type": "bar"}),
         ]
         for position, (title, kind, config) in enumerate(defaults):
             db.add(
@@ -171,6 +199,7 @@ def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user))
     db.commit()
     return {
         "days": workspace.days,
+        "card_limit": workspace.card_limit,
         "widgets": [public_widget(w) for w in widgets_for(db, user)],
     }
 
@@ -182,9 +211,12 @@ def period(
     row = db.get(WorkspaceSettings, user.id)
     if not row:
         raise HTTPException(409, "Abra o painel primeiro.")
-    row.days = data.days
+    if data.days is not None:
+        row.days = data.days
+    if data.card_limit is not None:
+        row.card_limit = data.card_limit
     db.commit()
-    return {"days": row.days}
+    return {"days": row.days, "card_limit": row.card_limit}
 
 
 @router.post("/widgets", status_code=201)
@@ -551,7 +583,7 @@ def widget_data(
     key = hashlib.sha256(
         json.dumps([days, end.isoformat(), row.config], sort_keys=True).encode()
     ).hexdigest()
-    external = row.kind in ("github", "news", "macro", "stock", "weather")
+    external = row.kind in ("github", "news", "macro", "stock", "weather", "teams")
     if (
         external
         and row.cached_data is not None
@@ -575,7 +607,11 @@ def widget_data(
         elif row.kind == "analysis":
             data = analysis_data(db, user, config)
         elif row.kind == "github":
-            data = providers.github_data(config.repository, start, end)
+            data = integrations.github_panel(db, user, config.repository, start, end)
+        elif row.kind == "teams":
+            data = integrations.task_panel(
+                db, user, config.task_source, config.task_list_id
+            )
         elif row.kind == "news":
             data = newsroom.aggregate(db, user, config, start, end, refresh)
         elif row.kind == "macro":

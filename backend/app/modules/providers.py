@@ -125,7 +125,8 @@ def series_chart(points, series, unit=""):
     return {"points": points, "series": series, "unit": unit}
 
 
-def github_data(repository, start, end):
+def github_data(repository, start, end, getter=None):
+    read_json = getter or get_json
     if not repository:
         return {
             "status": "needs_config",
@@ -137,8 +138,8 @@ def github_data(repository, start, end):
     ):
         raise ProviderError("Repositório inválido.")
     base = "https://api.github.com/repos/" + repository
-    repo = get_json(base)
-    commits = get_json(
+    repo = read_json(base)
+    commits = read_json(
         base
         + "/commits?per_page=100&since="
         + start.isoformat()
