@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 test("private workspace: management, spreadsheet analysis and export", async ({
   page,
 }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   async function capture(name: string) {
     const dismiss = page
       .locator(".toast-stack")
@@ -43,6 +43,15 @@ test("private workspace: management, spreadsheet analysis and export", async ({
               description:
                 "Resumo sintético para verificar a leitura no Command Center.",
               image: "https://example.com/photo.png",
+            },
+            {
+              title: "Outra manchete de teste",
+              url: "https://example.com/outra",
+              date: "2026-10-24",
+              source: "Fonte de teste",
+              category: "Economia",
+              image: "https://example.com/photo.png",
+              description: "Segunda notícia sintética para testar o carrossel.",
             },
           ],
         },
@@ -85,7 +94,29 @@ test("private workspace: management, spreadsheet analysis and export", async ({
           kpis: [],
         },
       });
-    } else if (kind === "macro") {
+    } else if (kind === "teams") {
+      await route.fulfill({
+        json: {
+          status: "ok",
+          source: "Microsoft To Do (fixture)",
+          kpis: [{ label: "A fazer", value: 1 }],
+          task_items: [
+            {
+              id: "t1",
+              title: "Revisar tarefas de teste",
+              completed: false,
+              due: "",
+              progress: 0,
+            },
+          ],
+          chart: {
+            points: [{ label: "A fazer", value: 1 }],
+            series: [{ key: "value", name: "Tarefas", color: "#9d8bff" }],
+            unit: "",
+          },
+        },
+      });
+    } else if (kind === "macro" || kind === "github") {
       await route.fulfill({
         json: {
           status: "ok",
@@ -153,6 +184,34 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     }
     await route.fulfill({ response });
   });
+  await page.route("**/api/integrations", (route) =>
+    route.fulfill({
+      json: {
+        github: { configured: true, connected: true, account: "conta-teste" },
+        microsoft: {
+          configured: true,
+          connected: true,
+          account: "conta-teste",
+        },
+      },
+    }),
+  );
+  await page.route("**/api/integrations/github/repositories?*", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            name: "phzl0/CommanderCenter",
+            description: "Repositório de teste",
+          },
+        ],
+        has_more: false,
+      },
+    }),
+  );
+  await page.route("**/api/integrations/microsoft/lists", (route) =>
+    route.fulfill({ json: [{ id: "list-test", name: "Lista de teste" }] }),
+  );
   await page.goto("/");
   await page.getByLabel("E-mail", { exact: true }).fill("e2e@example.test");
   await page
@@ -173,6 +232,46 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(
     nav.getByRole("button", { name: "Atividades", exact: true }),
   ).toHaveCount(0);
+  await expect(page.locator(".intelligence-card")).toHaveCount(4);
+  await expect(page.locator(".chart-loading")).toHaveCount(0);
+  const boxes = await page.locator(".intelligence-card").evaluateAll((cards) =>
+    cards.map((c) => {
+      const r = c.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }),
+  );
+  expect(boxes[0].height).toBe(400);
+  expect(boxes[1].height).toBe(400);
+  expect(boxes[0].width).toBe(boxes[1].width);
+  expect(boxes[2].height).toBe(820);
+  expect(boxes[2].x).toBeGreaterThan(boxes[0].x);
+  expect(boxes[3].width).toBeGreaterThan(boxes[0].width);
+  const carousel = page.getByRole("region", {
+    name: "Carrossel de notícias",
+    exact: true,
+  });
+  await page.mouse.move(0, 0);
+  await expect(carousel.locator(".news-title")).toHaveText(
+    "Outra manchete de teste",
+    { timeout: 10000 },
+  );
+  await carousel
+    .getByRole("button", { name: "Pausar notícias", exact: true })
+    .click();
+  await carousel
+    .getByRole("button", { name: "Notícia anterior", exact: true })
+    .click();
+  await expect(carousel.locator(".news-title")).toHaveText(
+    "Manchete de demonstração",
+  );
+  await capture("layout-four-desktop");
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByLabel("Quantidade de cards", { exact: true })
+    .selectOption("12");
+  await page
+    .getByRole("button", { name: "Fechar personalização", exact: true })
+    .click();
   const project = await page.request.post("/api/projects", {
     headers: { origin: "http://localhost:5173" },
     data: { name: "Projeto de teste" },
@@ -370,6 +469,16 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(news.locator(".news-feed")).toBeVisible();
   await expect(news.getByRole("img", { name: /Gráfico com/ })).toHaveCount(0);
   await news
+    .getByRole("button", { name: "Pausar notícias", exact: true })
+    .click();
+  if (
+    (await news.locator(".news-title").textContent()) !==
+    "Manchete de demonstração"
+  )
+    await news
+      .getByRole("button", { name: "Notícia anterior", exact: true })
+      .click();
+  await news
     .getByRole("button", {
       name: "Salvar notícia: Manchete de demonstração",
       exact: true,
@@ -383,6 +492,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Marcar como lida", exact: true })
+    .first()
     .click();
   await capture("news-detail");
   await nav.getByRole("button", { name: "Fontes", exact: true }).click();
@@ -464,6 +574,79 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await dialog
     .getByRole("button", { name: "Salvar painel", exact: true })
     .click();
+  // Repeated types have independent configuration. Repository selection is mocked; auth is covered by backend tests.
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Repositório GitHub/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Título do painel", { exact: true })
+    .fill("Outro GitHub");
+  await dialog
+    .getByRole("button", { name: "Listar repositórios", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: /phzl0\/CommanderCenter/ }).click();
+  await expect(
+    dialog.getByLabel("Repositório GitHub", { exact: true }),
+  ).toHaveValue("phzl0/CommanderCenter");
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Ações de empresas/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Título do painel", { exact: true })
+    .fill("Outra empresa");
+  await dialog.getByLabel("Código no provedor", { exact: true }).fill("MSFT");
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Tarefas do Teams/ })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Listar listas do To Do", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Lista do Microsoft To Do", { exact: true })
+    .selectOption("list-test");
+  await dialog
+    .getByLabel("Origem das tarefas", { exact: true })
+    .selectOption("todo");
+  await dialog
+    .getByRole("button", { name: "Salvar painel", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Tarefas do Teams", exact: true }),
+  ).toBeVisible();
+  const ws = await (
+    await page.request.post("/api/intelligence/bootstrap", {
+      headers: { origin: "http://localhost:5173" },
+    })
+  ).json();
+  expect(
+    ws.widgets.filter((w: { kind: string }) => w.kind === "github"),
+  ).toHaveLength(2);
+  expect(
+    ws.widgets.filter((w: { kind: string }) => w.kind === "stock"),
+  ).toHaveLength(2);
+  await page.getByRole("button", { name: "Personalizar", exact: true }).click();
+  await page
+    .getByLabel("Quantidade de cards", { exact: true })
+    .selectOption("4");
+  await page
+    .getByRole("button", { name: "Fechar personalização", exact: true })
+    .click();
+  await expect(page.locator(".intelligence-card")).toHaveCount(4);
   await expect(page.locator(".chart-loading")).toHaveCount(0);
   await capture("dashboard-desktop");
   await page.setViewportSize({ width: 390, height: 844 });

@@ -142,3 +142,9 @@ Novo tema escuro azul, gráficos de área/linha/barras e painéis escolhidos por
 ## Fontes e leitura (0.3)
 
 Radar com manchetes e imagens, três fontes iniciais e RSS personalizados por categoria. Favoritos e histórico de leitura privados, detalhes por card com tabelas fora da página inicial, notificações internas e opção de desfazer exclusões compatíveis. Busca de empresas por nome/código/link (Alpha Vantage, chave opcional) e clima por cidade (Open-Meteo). Veja [o guia das fontes e detalhes](docs/sources-and-details.md) para uso, limites e atualização local.
+
+## Layout e contas conectadas (0.4)
+
+Quatro cards por padrão: dois indicadores fixos à esquerda, notícias com fotos em carrossel à direita e um card largo abaixo. A quantidade é ajustável e permite repetir tipos de card. [Guia do layout](docs/dashboard-layout.md).
+
+GitHub aceita link completo e seleção de repositórios públicos após conectar a conta. O novo card Tarefas do Teams consulta Planner/To Do em modo de leitura. OAuth requer registrar aplicativos e configurar o `.env`; [guia de ativação e limites](docs/connections.md). Nenhuma mensagem é acessada. A chave de criptografia das conexões acompanha o volume de arquivos privados: preserve esse volume no backup.

@@ -53,9 +53,14 @@ function NewsImage({ url, title }: { url: string; title: string }) {
 export default function NewsFeed({
   items,
   compact = false,
+  onItemChange,
 }: {
   items: NewsItem[];
   compact?: boolean;
+  onItemChange?: (
+    url: string,
+    patch: { bookmarked: boolean; read: boolean },
+  ) => void;
 }) {
   const [rows, setRows] = useState(items),
     [busy, setBusy] = useState<string | null>(null);
@@ -82,6 +87,7 @@ export default function NewsFeed({
       setRows((old) =>
         old.map((r) => (r.url === item.url ? { ...r, ...result } : r)),
       );
+      onItemChange?.(item.url, result);
       if (patch.bookmarked !== undefined)
         notify({
           title: patch.bookmarked

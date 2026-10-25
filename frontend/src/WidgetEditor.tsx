@@ -9,6 +9,7 @@ import {
   type Widget,
   type WidgetInput,
 } from "./intelligenceTypes";
+import AccountConnection from "./AccountConnection";
 import type { Source } from "./Sources";
 type Company = {
   symbol: string;
@@ -220,20 +221,65 @@ export default function WidgetEditor({
             )}
           </div>
           {form.kind === "github" && (
-            <label>
-              Repositório público
-              <input
-                aria-label="Repositório público"
-                placeholder="dono/repositorio"
-                maxLength={140}
-                value={form.config.repository}
-                onChange={(e) => config({ repository: e.target.value.trim() })}
+            <section>
+              <AccountConnection
+                provider="github"
+                onRepository={(repository) => config({ repository })}
               />
+              <label>
+                Link do repositório ou dono/repositório
+                <input
+                  aria-label="Repositório GitHub"
+                  placeholder="https://github.com/dono/repositorio"
+                  maxLength={2048}
+                  value={form.config.repository}
+                  onChange={(e) =>
+                    config({ repository: e.target.value.trim() })
+                  }
+                />
+                <small className="muted">
+                  Pode colar o link completo. Repositórios públicos também
+                  funcionam sem conectar uma conta.
+                </small>
+              </label>
+            </section>
+          )}
+          {form.kind === "teams" && (
+            <section>
+              <AccountConnection
+                provider="microsoft"
+                onList={(task_list_id) => config({ task_list_id })}
+              />
+              <label>
+                Origem das tarefas
+                <select
+                  aria-label="Origem das tarefas"
+                  value={form.config.task_source}
+                  onChange={(e) =>
+                    config({
+                      task_source: e.target.value as "planner" | "todo",
+                    })
+                  }
+                >
+                  <option value="planner">Planner · atribuídas a mim</option>
+                  <option value="todo">
+                    Microsoft To Do · lista selecionada
+                  </option>
+                </select>
+              </label>
+              {form.config.task_source === "todo" && (
+                <p className="muted">
+                  {form.config.task_list_id
+                    ? "Lista selecionada na conexão acima."
+                    : "Conecte sua conta e selecione uma lista acima."}
+                </p>
+              )}
               <small className="muted">
-                Sem token. Até 100 commits da branch padrão no período. Esta
-                conexão é independente do GitHub conectado ao ChatGPT.
+                Leitura das tarefas atuais, sem alterar ou concluir itens.
+                Planner exige conta corporativa ou escolar e permissão da
+                organização.
               </small>
-            </label>
+            </section>
           )}
           {form.kind === "news" && (
             <section className="news-widget-settings">
@@ -536,14 +582,6 @@ export default function WidgetEditor({
               </small>
             </>
           )}
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={form.wide}
-              onChange={(e) => setForm({ ...form, wide: e.target.checked })}
-            />{" "}
-            Ocupar a largura inteira
-          </label>
           {error && (
             <div role="alert" className="error">
               {error}

@@ -16,6 +16,7 @@ import { api, send, type User } from "./api";
 import { Management } from "./Management";
 import { DataLab } from "./DataLab";
 import { Reports } from "./Reports";
+import { notify } from "./feedback";
 import { NotificationBell } from "./Notifications";
 const Sources = lazy(() => import("./Sources"));
 const WidgetDetails = lazy(() => import("./WidgetDetails"));
@@ -40,6 +41,25 @@ export default function App() {
       window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,
   );
   useEffect(() => {
+    const result = window.location.hash.match(
+      /^#\/connection\/(connected|failed|cancelled)$/,
+    )?.[1];
+    if (result) {
+      window.location.hash = "";
+      setTimeout(
+        () =>
+          notify({
+            title:
+              result === "connected"
+                ? "Conta conectada. Selecione um painel para configurar."
+                : result === "cancelled"
+                  ? "Conexão cancelada"
+                  : "Falha na conexão. Confira o aplicativo e as permissões.",
+            level: result === "failed" ? "error" : "info",
+          }),
+        600,
+      );
+    }
     const changed = () => {
       setDetailId(
         window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,

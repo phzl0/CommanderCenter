@@ -289,6 +289,37 @@ export default function WidgetDetails({
               </dl>
             </section>
           </div>
+          {widget.kind === "teams" && data.task_items && (
+            <section className="panel detail-data">
+              <div className="panel-heading">
+                <h2>Tarefas disponíveis</h2>
+              </div>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tarefa</th>
+                      <th>Situação</th>
+                      <th>Prazo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.task_items.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.title}</td>
+                        <td>{t.completed ? "Concluída" : "A fazer"}</td>
+                        <td>
+                          {t.due
+                            ? new Date(t.due).toLocaleDateString("pt-BR")
+                            : "Sem prazo"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
           {widget.kind !== "news" && data.chart && (
             <section className="panel detail-data">
               <div className="panel-heading">

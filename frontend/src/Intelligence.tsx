@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Database,
   CloudSun,
+  ListTodo,
 } from "lucide-react";
 import { api, send, type User } from "./api";
 import {
@@ -39,7 +40,7 @@ import {
 import WidgetChart from "./WidgetChart";
 import WidgetEditor from "./WidgetEditor";
 import QuickRecords from "./QuickRecords";
-import NewsFeed from "./NewsFeed";
+import NewsCarousel from "./NewsCarousel";
 import WeatherView from "./WeatherView";
 const icons = {
   tasks: Check,
@@ -51,6 +52,7 @@ const icons = {
   stock: TrendingUp,
   analysis: BarChart3,
   weather: CloudSun,
+  teams: ListTodo,
 };
 function WidgetCard({
   widget,
@@ -88,7 +90,9 @@ function WidgetCard({
     hasPoints = !!data?.chart?.points.length;
   return (
     <section
-      className={"panel intelligence-card " + (widget.wide ? "wide" : "")}
+      className={
+        "panel intelligence-card " + (widget.kind === "news" ? "news-card" : "")
+      }
       aria-label={widget.title}
     >
       <div className="widget-heading">
@@ -156,7 +160,7 @@ function WidgetCard({
             </div>
           )}
           {widget.kind === "news" && hasData && data?.items?.length ? (
-            <NewsFeed items={data.items} compact />
+            <NewsCarousel items={data.items} />
           ) : widget.kind === "weather" && hasData && data?.weather ? (
             <WeatherView weather={data.weather} city={data.city} />
           ) : widget.kind !== "news" && hasData && hasPoints && data.chart ? (
@@ -164,6 +168,7 @@ function WidgetCard({
               data={data.chart}
               type={widget.config.chart_type}
               id={widget.id}
+              height={150}
             />
           ) : (
             <div
@@ -254,6 +259,19 @@ function WidgetCard({
         </>
       )}
       <div className="card-detail-actions">
+        {widget.kind === "github" && (
+          <button className="quiet" onClick={onEdit}>
+            <Github size={13} />
+            {widget.config.repository
+              ? "Selecionar repositório"
+              : "Conectar GitHub"}
+          </button>
+        )}
+        {widget.kind === "teams" && (
+          <button className="quiet" onClick={onEdit}>
+            Conectar Microsoft
+          </button>
+        )}
         <a href={detailUrl(widget.id)}>
           Ver detalhes <ChevronRight size={14} />
         </a>
@@ -272,6 +290,7 @@ function WidgetCard({
 export default function Intelligence({ user }: { user: User }) {
   const [widgets, setWidgets] = useState<Widget[]>([]),
     [days, setDays] = useState(30),
+    [cardLimit, setCardLimit] = useState(4),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState(""),
     [customizing, setCustomizing] = useState(false),
@@ -282,12 +301,14 @@ export default function Intelligence({ user }: { user: User }) {
     [version, setVersion] = useState(0),
     [busy, setBusy] = useState(false);
   async function load() {
-    const r = await api<{ days: number; widgets: Widget[] }>(
-      "/intelligence/bootstrap",
-      { method: "POST" },
-    );
+    const r = await api<{
+      days: number;
+      card_limit: number;
+      widgets: Widget[];
+    }>("/intelligence/bootstrap", { method: "POST" });
     setWidgets(r.widgets);
     setDays(r.days);
+    setCardLimit(r.card_limit);
     setLoaded(true);
   }
   useEffect(() => {
@@ -305,10 +326,22 @@ export default function Intelligence({ user }: { user: User }) {
     window.addEventListener("cc-data-changed", changed);
     return () => window.removeEventListener("cc-data-changed", changed);
   }, []);
-  const visible = widgets.filter((w) => w.visible),
-    publicSources = visible.filter((w) =>
-      ["github", "news", "macro", "stock", "weather"].includes(w.kind),
-    ).length;
+  const active = widgets.filter((w) => w.visible);
+  const primaryNews = active.find((w) => w.kind === "news");
+  const ordered =
+    cardLimit >= 3 && primaryNews
+      ? active.filter((w) => w.id !== primaryNews.id)
+      : active;
+  const visible = ordered.slice(
+    0,
+    cardLimit - (cardLimit >= 3 && primaryNews ? 1 : 0),
+  );
+  if (cardLimit >= 3 && primaryNews)
+    visible.splice(Math.min(2, visible.length), 0, primaryNews);
+  const hasNewsSlot = visible.length >= 3 && visible[2].kind === "news";
+  const publicSources = visible.filter((w) =>
+    ["github", "news", "macro", "stock", "weather", "teams"].includes(w.kind),
+  ).length;
   async function saveWidget(w: Widget, patch: Partial<WidgetInput>) {
     setBusy(true);
     setError("");
@@ -363,6 +396,17 @@ export default function Intelligence({ user }: { user: User }) {
     try {
       await api("/intelligence/settings", send("PUT", { days: value }));
       setDays(value);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function limit(value: number) {
+    setBusy(true);
+    try {
+      await api("/intelligence/settings", send("PUT", { card_limit: value }));
+      setCardLimit(value);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -447,7 +491,12 @@ export default function Intelligence({ user }: { user: User }) {
           </button>
         </div>
       ) : (
-        <div className="intelligence-grid">
+        <div
+          className={
+            "intelligence-grid fixed-layout " +
+            (hasNewsSlot ? "has-news-slot" : "")
+          }
+        >
           {visible.map((w) => (
             <WidgetCard
               key={w.id}
@@ -491,9 +540,26 @@ export default function Intelligence({ user }: { user: User }) {
               </button>
             </div>
             <p className="muted">
-              Mostre, oculte e organize até 12 painéis. Suas escolhas são salvas
-              na sua conta.
+              Adicione tipos repetidos e organize até 12 painéis. O primeiro
+              radar de notícias fica na lateral; o último card ocupa a largura
+              inferior. Seus cards fora do limite são mantidos.
             </p>
+            <label className="card-limit-setting">
+              Quantidade de cards na visão geral
+              <select
+                aria-label="Quantidade de cards"
+                value={cardLimit}
+                disabled={busy}
+                onChange={(e) => limit(Number(e.target.value))}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1}
+                    {i === 3 ? " (padrão)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="widget-management">
               {widgets.map((w, i) => {
                 const Icon = icons[w.kind];
@@ -504,6 +570,9 @@ export default function Intelligence({ user }: { user: User }) {
                       <strong>{w.title}</strong>
                       <small>
                         {catalogue.find((c) => c.kind === w.kind)?.name}
+                        {w.visible && !visible.some((v) => v.id === w.id)
+                          ? " · Fora do limite atual"
+                          : ""}
                       </small>
                     </span>
                     <button

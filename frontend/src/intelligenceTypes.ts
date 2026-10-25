@@ -7,8 +7,11 @@ export type Kind =
   | "macro"
   | "stock"
   | "analysis"
-  | "weather";
+  | "weather"
+  | "teams";
 export type Config = {
+  task_source: "planner" | "todo";
+  task_list_id: string;
   chart_type: "area" | "line" | "bar";
   repository: string;
   feed: "ibge" | "economia" | "politica";
@@ -55,6 +58,13 @@ export type ChartData = {
   kpis?: { label: string; value: number | null; unit?: string }[];
   distribution?: { name: string; value: number }[];
   items?: import("./NewsFeed").NewsItem[];
+  task_items?: {
+    id: string;
+    title: string;
+    completed: boolean;
+    due: string;
+    progress: number;
+  }[];
   source_errors?: { source: string; message: string }[];
   suggestions?: string[];
   city?: string;
@@ -78,6 +88,8 @@ export type ChartData = {
   link?: string;
 };
 export const initialConfig: Config = {
+  task_source: "planner",
+  task_list_id: "",
   chart_type: "area",
   repository: "",
   feed: "ibge",
@@ -105,6 +117,12 @@ export const catalogue: {
   description: string;
   tag: string;
 }[] = [
+  {
+    kind: "teams",
+    name: "Tarefas do Teams",
+    description: "Tarefas atribuídas do Planner e listas do Microsoft To Do.",
+    tag: "Microsoft 365 · somente leitura",
+  },
   {
     kind: "personal",
     name: "Atividade pessoal",
