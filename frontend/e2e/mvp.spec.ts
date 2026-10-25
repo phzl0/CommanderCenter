@@ -3,6 +3,16 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   page,
 }) => {
   test.setTimeout(120000);
+  async function capture(name: string) {
+    const dismiss = page
+      .locator(".toast-stack")
+      .getByRole("button", { name: "Dispensar notificação", exact: true });
+    while (await dismiss.count()) await dismiss.first().click();
+    await page.screenshot({
+      path: "test-results/" + name + ".png",
+      fullPage: true,
+    });
+  }
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // External panels use explicit test fixtures; no reliance on public quotas or live prices.
@@ -43,8 +53,8 @@ test("private workspace: management, spreadsheet analysis and export", async ({
           status: "ok",
           source: "Open-Meteo (fixture)",
           kpis: [],
+          city: "Campinas, São Paulo, Brasil",
           weather: {
-            city: "Campinas, São Paulo, Brasil",
             temperature: 25,
             feels_like: 26,
             humidity: 60,
@@ -326,6 +336,18 @@ test("private workspace: management, spreadsheet analysis and export", async ({
       .getByRole("region", { name: "Minha planilha", exact: true })
       .getByRole("img", { name: /Gráfico com/ }),
   ).toBeVisible();
+  const newTab = page.waitForEvent("popup");
+  await personal
+    .getByRole("link", {
+      name: "Abrir em nova aba: Minha atividade pessoal",
+      exact: true,
+    })
+    .click();
+  const detailTab = await newTab;
+  await expect(
+    detailTab.getByRole("heading", { name: "Dados do gráfico", exact: true }),
+  ).toBeVisible();
+  await detailTab.close();
   await expect(
     page.getByText("Ver dados do gráfico", { exact: true }),
   ).toHaveCount(0);
@@ -339,10 +361,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(
     page.getByRole("heading", { name: "Dados do gráfico", exact: true }),
   ).toBeVisible();
-  await page.screenshot({
-    path: "test-results/detail-desktop.png",
-    fullPage: true,
-  });
+  await capture("detail-desktop");
   await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
   const news = page.getByRole("region", {
     name: "Radar de notícias",
@@ -365,10 +384,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page
     .getByRole("button", { name: "Marcar como lida", exact: true })
     .click();
-  await page.screenshot({
-    path: "test-results/news-detail.png",
-    fullPage: true,
-  });
+  await capture("news-detail");
   await nav.getByRole("button", { name: "Fontes", exact: true }).click();
   await expect(page.locator(".source-card")).toHaveCount(3);
   const source = page.locator(".source-card").filter({
@@ -391,10 +407,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     .getByRole("button", { name: "Desfazer", exact: true })
     .click();
   await expect(page.locator(".source-card")).toHaveCount(3);
-  await page.screenshot({
-    path: "test-results/sources-desktop.png",
-    fullPage: true,
-  });
+  await capture("sources-desktop");
   await page.getByRole("button", { name: "Ler depois", exact: true }).click();
   await expect(page.locator(".news-title")).toHaveText(
     "Manchete de demonstração",
@@ -452,10 +465,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
     .getByRole("button", { name: "Salvar painel", exact: true })
     .click();
   await expect(page.locator(".chart-loading")).toHaveCount(0);
-  await page.screenshot({
-    path: "test-results/dashboard-desktop.png",
-    fullPage: true,
-  });
+  await capture("dashboard-desktop");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await nav.getByRole("button", { name: "Visão geral", exact: true }).click();
@@ -463,9 +473,6 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(
     page.getByRole("button", { name: "Personalizar", exact: true }),
   ).toBeVisible();
-  await page.screenshot({
-    path: "test-results/dashboard-mobile.png",
-    fullPage: true,
-  });
+  await capture("dashboard-mobile");
   expect(errors).toEqual([]);
 });

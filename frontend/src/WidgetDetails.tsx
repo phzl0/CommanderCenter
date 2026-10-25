@@ -171,7 +171,7 @@ export default function WidgetDetails({
       ) : data && widget ? (
         <>
           <section className="panel detail-primary">
-            {data.kpis && (
+            {!!data.kpis?.length && (
               <div className="detail-kpis">
                 {data.kpis.map((k) => (
                   <div key={k.label}>

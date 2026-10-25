@@ -470,7 +470,7 @@ def image(url: str, user: User = Depends(current_user)):
             raw,
             media_type=media[kind],
             headers={
-                "Cache-Control": "private, max-age=600",
+                "Cache-Control": "no-store",
                 "X-Content-Type-Options": "nosniff",
             },
         )

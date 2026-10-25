@@ -307,7 +307,7 @@ def test_image_proxy_only_valid_images(client, monkeypatch):
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
-    assert response.headers["cache-control"].startswith("private")
+    assert response.headers["cache-control"] == "no-store"
     monkeypatch.setattr(
         newsroom,
         "public_fetch",
@@ -336,7 +336,7 @@ def test_category_filter_before_limit_and_failed_source_cooldown(
     client, env, monkeypatch
 ):
     from app.models import NewsSource
-    from app.modules.intelligence import Config, date_range
+    from app.modules.intelligence import WidgetConfig, date_range
 
     client.post("/api/sources/bootstrap")
     _, factory = env
@@ -363,7 +363,7 @@ def test_category_filter_before_limit_and_failed_source_cooldown(
 
         user = db.get(User, "user-a")
         start, end = date_range(30)
-        config = Config(news_category="Jogos")
+        config = WidgetConfig(news_category="Jogos")
         data = newsroom.aggregate(db, user, config, start, end)
         assert data["status"] == "unavailable" and calls == ["Fonte 6"]
         newsroom.aggregate(db, user, config, start, end, refresh=True)
