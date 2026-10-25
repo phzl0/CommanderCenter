@@ -149,6 +149,7 @@ function WidgetCard({
                 <div key={k.label}>
                   <span>{k.label}</span>
                   <strong
+                    title={formatValue(k.value, k.unit)}
                     className={
                       widget.kind === "finance" &&
                       i === 2 &&
@@ -173,7 +174,7 @@ function WidgetCard({
               type={widget.config.chart_type}
               kind={widget.kind}
               id={widget.id}
-              height={widget.kind === "tasks" ? 135 : 165}
+              height={widget.kind === "tasks" ? 110 : 135}
             />
           ) : (
             <div

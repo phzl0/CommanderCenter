@@ -777,3 +777,27 @@ footer {
 .analysis-actions {
   margin-top: 12px;
 }
+
+.compact-grid .card-detail-actions > button {
+  font-size: 10px;
+  padding: 3px 0;
+}
+.compact-grid .card-detail-actions {
+  min-height: 26px;
+}
+.compact-grid .widget-kpis {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.compact-grid .widget-kpis > div {
+  min-width: 0;
+  flex: 1;
+}
+.compact-grid .widget-kpis strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compact-grid .widget-kpis span {
+  font-size: 9px;
+}

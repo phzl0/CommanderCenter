@@ -7,6 +7,12 @@ test("compact command center: five cards, news, calendar, files and exports", as
   page.on("pageerror", (e) => errors.push(e.message));
   const origin = { origin: "http://localhost:5173" };
   async function capture(name: string) {
+    const dismiss = page
+      .locator(".toast-stack")
+      .getByRole("button", { name: "Dispensar notificação", exact: true });
+    while (await dismiss.count()) await dismiss.first().click();
+    if ((page.viewportSize()?.width || 1440) <= 760)
+      await expect(page.locator(".sidebar")).not.toBeInViewport();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `test-results/${name}.png`, fullPage: true });
   }
@@ -135,6 +141,13 @@ test("compact command center: five cards, news, calendar, files and exports", as
   expect(boxes[0].y).toBeLessThan(210);
   expect(boxes[0].height).toBe(boxes[1].height);
   expect(boxes[4].width).toBeGreaterThan(boxes[0].width * 1.8);
+  for (const card of await page.locator(".intelligence-card").all()) {
+    const region = await card.boundingBox();
+    const action = await card.locator(".card-detail-actions").boundingBox();
+    expect(action!.y + action!.height).toBeLessThanOrEqual(
+      region!.y + region!.height,
+    );
+  }
   await capture("dashboard-desktop");
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await expect(
