@@ -41,6 +41,7 @@ class ProjectInput(StrictModel):
 
 
 class TaskInput(StrictModel):
+    context: Literal["personal", "professional", "general"] = "general"
     title: str = Field(min_length=1, max_length=160)
     description: str = Field(default="", max_length=10000)
     project_id: str | None = None

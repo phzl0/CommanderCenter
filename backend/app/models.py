@@ -73,6 +73,9 @@ class Task(Owned, Base):
         CheckConstraint("status IN ('pending','in_progress','completed')"),
         CheckConstraint("priority IN ('low','medium','high')"),
     )
+    context: Mapped[str] = mapped_column(
+        String(16), default="general", server_default="general"
+    )
     project_id: Mapped[str | None] = mapped_column(String(36), index=True)
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
@@ -242,3 +245,22 @@ class IntegrationFlow(Base):
     provider: Mapped[str] = mapped_column(String(20))
     verifier: Mapped[str] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class DailyPlan(Owned, Base):
+    __tablename__ = "daily_plans"
+    __table_args__ = (UniqueConstraint("owner_id", "day"),)
+    day: Mapped[date] = mapped_column(Date)
+    priority_ids: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    summary: Mapped[dict | None] = mapped_column(JSON)
+
+
+class InboxCapture(Owned, Base):
+    __tablename__ = "inbox_captures"
+    text: Mapped[str] = mapped_column(String(160))
+    kind: Mapped[str] = mapped_column(String(16), default="note")
+    context: Mapped[str] = mapped_column(String(16), default="general")
+    processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    task_id: Mapped[str | None] = mapped_column(String(36))

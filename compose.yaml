@@ -24,7 +24,7 @@ services:
       MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
       MICROSOFT_TENANT: ${MICROSOFT_TENANT:-organizations}
-      INTEGRATION_ORIGIN: http://localhost:5173
+      INTEGRATION_ORIGIN: ${INTEGRATION_ORIGIN:-http://localhost:5173}
       STORAGE_DIR: /app/storage
       ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     volumes:

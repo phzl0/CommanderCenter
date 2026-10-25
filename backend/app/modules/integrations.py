@@ -91,6 +91,25 @@ def specification(provider):
     }
 
 
+def callback_url(provider):
+    origin = settings.integration_origin.rstrip("/")
+    parsed = urlparse(origin)
+    if (
+        parsed.scheme not in ("http", "https")
+        or not parsed.hostname
+        or parsed.username
+        or parsed.query
+        or parsed.fragment
+        or parsed.path
+        or origin not in [o.strip() for o in settings.allowed_origins.split(",")]
+    ):
+        raise HTTPException(
+            503,
+            "INTEGRATION_ORIGIN deve ser uma origem permitida, sem caminho, como http://localhost:5173.",
+        )
+    return origin + f"/api/integrations/{provider}/callback"
+
+
 def configured(provider):
     s = specification(provider)
     return bool(s["id"] and s["secret"])
@@ -207,6 +226,7 @@ def status(db: Session = Depends(get_db), user: User = Depends(current_user)):
             "configured": configured(p),
             "connected": bool(r := connection(db, user, p)),
             "account": r.account if r else None,
+            "callback_url": callback_url(p),
         }
         for p in ("github", "microsoft")
     }
@@ -220,6 +240,14 @@ def start(
     user: User = Depends(current_user),
 ):
     spec = specification(provider)
+    redirect = callback_url(provider)
+    if request.headers.get("origin") != settings.integration_origin.rstrip("/"):
+        raise HTTPException(
+            409,
+            "Para conectar, abra o Command Center em "
+            + settings.integration_origin.rstrip("/")
+            + " e entre novamente.",
+        )
     if not configured(provider):
         raise HTTPException(
             409,
@@ -255,8 +283,7 @@ def start(
     db.commit()
     params = {
         "client_id": spec["id"],
-        "redirect_uri": settings.integration_origin
-        + f"/api/integrations/{provider}/callback",
+        "redirect_uri": redirect,
         "state": state,
         "scope": spec["scope"],
         "response_type": "code",
@@ -306,8 +333,7 @@ def callback(
                     "client_secret": spec["secret"],
                     "code": code,
                     "grant_type": "authorization_code",
-                    "redirect_uri": settings.integration_origin
-                    + f"/api/integrations/{provider}/callback",
+                    "redirect_uri": callback_url(provider),
                     "code_verifier": verifier,
                 },
             )
@@ -344,7 +370,8 @@ def callback(
             db.rollback()
             outcome = "failed"
     return RedirectResponse(
-        settings.integration_origin + "/#/connection/" + outcome, status_code=303
+        settings.integration_origin.rstrip("/") + "/#/connection/" + outcome,
+        status_code=303,
     )
 
 

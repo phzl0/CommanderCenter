@@ -57,3 +57,25 @@ Desconectar remove a autorização armazenada localmente e invalida o cache dos 
 Nenhuma credencial real foi criada automaticamente nesta etapa. Os fluxos de autenticação e consulta têm testes simulados, mas a validação ao vivo depende de registrar os aplicativos e autorizar as contas reais.
 
 Referências oficiais: [OAuth GitHub](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Planner atribuído ao usuário](https://learn.microsoft.com/en-us/graph/api/planneruser-list-tasks?view=graph-rest-1.0), [tarefas do To Do](https://learn.microsoft.com/en-us/graph/api/todotasklist-list-tasks?view=graph-rest-1.0).
+
+## Erro “redirect_uri is not associated with this application”
+
+O GitHub recusou a URL de retorno enviada pelo aplicativo. Não é uma falha da senha do Command Center. No OAuth App que corresponde ao `GITHUB_CLIENT_ID` configurado, confira **Authorization callback URL**:
+
+```text
+http://localhost:5173/api/integrations/github/callback
+```
+
+Homepage URL é `http://localhost:5173`; o campo callback recebe a URL completa acima. Não use o link do repositório como callback. Confira que Client ID e Client Secret pertencem ao mesmo OAuth App. Se cadastrou uma GitHub App em vez de uma OAuth App, crie uma OAuth App para seguir esta integração.
+
+A configuração do card agora mostra a URL efetivamente utilizada pelo backend. Copie-a para o cadastro do provedor. Não altere o destino para um domínio desconhecido e não remova a validação da URL para contornar o erro.
+
+O Compose aceita `INTEGRATION_ORIGIN` no `.env` (padrão `http://localhost:5173`). Se escolher `http://127.0.0.1:5173`, cadastre o callback com esse mesmo host e use esse endereço no navegador. São sessões de navegador distintas: o backend pede que a conexão seja iniciada na origem configurada. A origem precisa estar na lista `ALLOWED_ORIGINS` do servidor. Não acrescente caminho ou `/#/` ao `INTEGRATION_ORIGIN`.
+
+Depois de mudar o `.env`, recrie o backend para carregar as variáveis:
+
+```bash
+sudo docker compose up --build -d backend
+```
+
+Se alterou apenas o callback no GitHub, volte ao Command Center e inicie **Conectar GitHub** novamente. Não reutilize a página de autorização antiga. O aplicativo não consegue verificar nem editar a configuração de uma OAuth App no GitHub em seu nome.
