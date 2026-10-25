@@ -565,15 +565,14 @@ def aggregate(db, user, config, start, end, refresh=False):
     )
     if config.news_source_ids:
         query = query.where(NewsSource.id.in_(config.news_source_ids))
-    sources = list(
-        db.scalars(query.order_by(NewsSource.created_at, NewsSource.id).limit(6))
-    )
+    sources = list(db.scalars(query.order_by(NewsSource.created_at, NewsSource.id)))
     if config.news_category:
         sources = [
             s
             for s in sources
             if normalize(s.category) == normalize(config.news_category)
         ]
+    sources = sources[:6]
     if not sources:
         return {
             "status": "needs_config",
@@ -586,10 +585,8 @@ def aggregate(db, user, config, start, end, refresh=False):
     futures = {}
     with ThreadPoolExecutor(max_workers=6) as pool:
         for s in sources:
-            if (
-                s.cached_items is not None
-                and s.checked_at
-                and (now() - s.checked_at).total_seconds() < (30 if refresh else 600)
+            if s.checked_at and (now() - s.checked_at).total_seconds() < (
+                30 if refresh else 600
             ):
                 continue
             futures[s.id] = pool.submit(
@@ -603,6 +600,7 @@ def aggregate(db, user, config, start, end, refresh=False):
                     s.checked_at = now()
                     s.last_error = None
                 except Exception as e:
+                    s.checked_at = now()
                     s.last_error = (
                         str(e)[:500]
                         if isinstance(e, providers.ProviderError)

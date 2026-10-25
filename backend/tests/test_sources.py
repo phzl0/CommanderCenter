@@ -330,3 +330,41 @@ def test_image_proxy_only_valid_images(client, monkeypatch):
         ).status_code
         == 401
     )
+
+
+def test_category_filter_before_limit_and_failed_source_cooldown(
+    client, env, monkeypatch
+):
+    from app.models import NewsSource
+    from app.modules.intelligence import Config, date_range
+
+    client.post("/api/sources/bootstrap")
+    _, factory = env
+    calls = []
+
+    def failing(source):
+        calls.append(source["name"])
+        raise providers.ProviderError("Temporariamente indisponível")
+
+    monkeypatch.setattr(newsroom, "load_feed", failing)
+    with factory() as db:
+        for i in range(7):
+            db.add(
+                NewsSource(
+                    owner_id="user-a",
+                    name=f"Fonte {i}",
+                    category="Jogos" if i == 6 else "Geral",
+                    url=f"https://example.com/{i}",
+                    kind="rss",
+                )
+            )
+        db.commit()
+        from app.models import User
+
+        user = db.get(User, "user-a")
+        start, end = date_range(30)
+        config = Config(news_category="Jogos")
+        data = newsroom.aggregate(db, user, config, start, end)
+        assert data["status"] == "unavailable" and calls == ["Fonte 6"]
+        newsroom.aggregate(db, user, config, start, end, refresh=True)
+        assert calls == ["Fonte 6"]
