@@ -23,6 +23,7 @@ type Notice = {
   read: boolean;
   created_at: string;
   action: UndoAction | null;
+  target?: { kind: string; id?: string };
 };
 async function undo(action: UndoAction) {
   await api(`/notifications/restore/${action.kind}/${action.id}`, {
@@ -36,6 +37,8 @@ export function NotificationHub() {
   const [toasts, setToasts] = useState<(ToastMessage & { id: number })[]>([]),
     [confirmation, setConfirmation] = useState<{
       message: string;
+      title?: string;
+      confirmLabel?: string;
       resolve: (answer: boolean) => void;
     } | null>(null);
   useEffect(() => {
@@ -120,7 +123,9 @@ export function NotificationHub() {
             aria-modal="true"
             aria-labelledby="confirm-title"
           >
-            <h2 id="confirm-title">Confirmar exclusão</h2>
+            <h2 id="confirm-title">
+              {confirmation.title || "Confirmar exclusão"}
+            </h2>
             <p>{confirmation.message}</p>
             <div className="modal-actions">
               <button
@@ -139,7 +144,7 @@ export function NotificationHub() {
                   setConfirmation(null);
                 }}
               >
-                Excluir
+                {confirmation.confirmLabel || "Excluir"}
               </button>
             </div>
           </section>
@@ -168,6 +173,9 @@ export function NotificationBell() {
   useEffect(() => {
     let timer: number;
     load();
+    const interval = window.setInterval(() => {
+      if (!document.hidden) load();
+    }, 300000);
     const reload = () => {
       clearTimeout(timer);
       timer = window.setTimeout(load, 200);
@@ -175,6 +183,7 @@ export function NotificationBell() {
     window.addEventListener("cc-notifications-changed", reload);
     return () => {
       clearTimeout(timer);
+      clearInterval(interval);
       window.removeEventListener("cc-notifications-changed", reload);
     };
   }, []);
@@ -247,6 +256,44 @@ export function NotificationBell() {
                       {new Date(n.created_at + "Z").toLocaleString("pt-BR")}
                     </small>
                   </button>
+                  {n.target && (
+                    <div className="notice-actions">
+                      <button
+                        className="quiet"
+                        onClick={() => {
+                          setOpen(false);
+                          if (n.target?.kind === "task" && n.target.id) {
+                            const hash = "#/tarefa/" + n.target.id;
+                            if (window.location.hash === hash)
+                              window.dispatchEvent(
+                                new HashChangeEvent("hashchange"),
+                              );
+                            else window.location.hash = hash;
+                          } else
+                            window.dispatchEvent(
+                              new CustomEvent("cc-navigate", {
+                                detail: {
+                                  tab: "account",
+                                  section: "connections",
+                                },
+                              }),
+                            );
+                        }}
+                      >
+                        Abrir {n.target.kind === "task" ? "tarefa" : "conexões"}
+                      </button>
+                      <button
+                        className="quiet"
+                        onClick={() =>
+                          api(`/notifications/${n.id}/read`, { method: "POST" })
+                            .then(load)
+                            .catch((e) => setError(e.message))
+                        }
+                      >
+                        Dispensar
+                      </button>
+                    </div>
+                  )}
                   {n.action &&
                     Date.now() - new Date(n.created_at + "Z").getTime() <
                       600000 && (

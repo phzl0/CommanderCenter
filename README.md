@@ -156,3 +156,7 @@ Fundo preto, superfícies neutras e cores distintas por tipo de informação, co
 ## Meu dia e paleta harmônica
 
 Fundo azul muito escuro, tons próximos de azul/azul-marinho e verde-claro nos indicadores. A aba [Meu dia](docs/meu-dia.md) acrescenta captura rápida, contexto pessoal/profissional, até três prioridades, reagendamento, fechamento diário e revisão de sete dias. O guia de conexões inclui o diagnóstico de divergência de callback do GitHub; a URL de retorno também aparece na configuração do card.
+
+## Perfil, segurança e planejamento (0.6)
+
+Menu de perfil no canto superior direito; foto e dados privados; preferências persistentes; troca de senha e encerramento de sessões. Central de conexões com GitHub, Microsoft e Google Calendar. Tarefas com etiquetas, filtros e recorrências, metas ligadas a tarefas/tempo, agenda local e leitura de calendários Google, capacidade diária de referência e alertas internos acionáveis. [Guia de uso e limites](docs/perfil-e-planejamento.md).

@@ -1,3 +1,4 @@
+import { todayInAccount } from "./userPreferences";
 import { confirmAction } from "./feedback";
 import { useEffect, useState } from "react";
 import { X, Trash2, Pencil, Plus } from "lucide-react";
@@ -5,6 +6,7 @@ import { api, send, dateLabel } from "./api";
 import { formatValue } from "./intelligenceTypes";
 type Entry = {
   id: string;
+  goal_id?: string | null;
   entry_date: string;
   label?: string;
   minutes?: number;
@@ -13,12 +15,7 @@ type Entry = {
   direction?: string;
   amount_cents?: number;
 };
-const today = () => {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10);
-};
+const today = todayInAccount;
 export default function QuickRecords({
   onClose,
   onSaved,
@@ -26,6 +23,14 @@ export default function QuickRecords({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const [goals, setGoals] = useState<
+    { id: string; title: string; metric: string }[]
+  >([]);
+  useEffect(() => {
+    api<typeof goals>("/planning/goals")
+      .then(setGoals)
+      .catch(() => {});
+  }, []);
   const [kind, setKind] = useState<"personal" | "finance">("personal"),
     [entries, setEntries] = useState<Entry[]>([]),
     [editing, setEditing] = useState<Entry | null>(null),
@@ -58,6 +63,7 @@ export default function QuickRecords({
       kind === "personal"
         ? {
             label: f.get("label"),
+            goal_id: f.get("goal_id") || null,
             minutes: Number(f.get("minutes")),
             entry_date: f.get("entry_date"),
           }
@@ -148,6 +154,26 @@ export default function QuickRecords({
             key={kind + "-" + (editing?.id || "new") + "-" + version}
             onSubmit={save}
           >
+            {kind === "personal" && (
+              <label>
+                Meta de tempo
+                <select
+                  aria-label="Meta de tempo"
+                  name="goal_id"
+                  defaultValue={editing?.goal_id || ""}
+                  key={editing?.id || "new"}
+                >
+                  <option value="">Sem meta</option>
+                  {goals
+                    .filter((g) => g.metric === "minutes")
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
             <h3>{editing ? "Editar registro" : "Novo registro"}</h3>
             {kind === "personal" ? (
               <>

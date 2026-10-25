@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { getPreferences, type Preferences } from "./userPreferences";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
 export default function NewsCarousel({ items }: { items: NewsItem[] }) {
   const [rows, setRows] = useState(items);
   const [index, setIndex] = useState(0),
     [paused, setPaused] = useState(
-      () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      () =>
+        getPreferences().reduce_motion ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     ),
     [hover, setHover] = useState(false),
     [focus, setFocus] = useState(false),
@@ -14,6 +17,13 @@ export default function NewsCarousel({ items }: { items: NewsItem[] }) {
     setIndex(0);
     setRows(items);
   }, [items]);
+  useEffect(() => {
+    const update = (e: Event) => {
+      if ((e as CustomEvent<Preferences>).detail.reduce_motion) setPaused(true);
+    };
+    window.addEventListener("cc-preferences", update);
+    return () => window.removeEventListener("cc-preferences", update);
+  }, []);
   useEffect(() => {
     const changed = () => setHidden(document.hidden);
     document.addEventListener("visibilitychange", changed);

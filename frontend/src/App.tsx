@@ -4,7 +4,6 @@ import {
   ListTodo,
   FileSpreadsheet,
   Files,
-  LogOut,
   Command,
   ArrowUpRight,
   Menu,
@@ -12,21 +11,39 @@ import {
   ShieldCheck,
   Rss,
   Sun,
+  Target,
+  CalendarDays,
 } from "lucide-react";
+import AccountMenu, { type AccountSection } from "./AccountMenu";
+import { applyPreferences } from "./userPreferences";
 import { api, send, type User } from "./api";
 import { Management } from "./Management";
 import { DataLab } from "./DataLab";
 import { Reports } from "./Reports";
 import { notify } from "./feedback";
 import { NotificationBell } from "./Notifications";
+const AccountPage = lazy(() => import("./AccountPage"));
+const Goals = lazy(() => import("./Goals"));
+const Agenda = lazy(() => import("./Agenda"));
 const MyDay = lazy(() => import("./MyDay"));
 const Sources = lazy(() => import("./Sources"));
 const WidgetDetails = lazy(() => import("./WidgetDetails"));
 const Intelligence = lazy(() => import("./Intelligence"));
-type Tab = "dashboard" | "tasks" | "imports" | "reports" | "sources" | "daily";
+type Tab =
+  | "dashboard"
+  | "tasks"
+  | "imports"
+  | "reports"
+  | "sources"
+  | "daily"
+  | "account"
+  | "goals"
+  | "agenda";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
   { id: "daily", label: "Meu dia", icon: Sun },
+  { id: "agenda", label: "Agenda", icon: CalendarDays },
+  { id: "goals", label: "Metas", icon: Target },
   { id: "tasks", label: "Tarefas", icon: ListTodo },
   { id: "imports", label: "Dados e análises", icon: FileSpreadsheet },
   { id: "reports", label: "Relatórios", icon: Files },
@@ -39,6 +56,13 @@ export default function App() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [menu, setMenu] = useState(false);
+  const [taskOpenVersion, setTaskOpenVersion] = useState(0);
+  const [accountSection, setAccountSection] =
+    useState<AccountSection>("profile");
+  const [taskId, setTaskId] = useState<string | null>(
+    () =>
+      window.location.hash.match(/^#\/tarefa\/([A-Za-z0-9-]+)$/)?.[1] || null,
+  );
   const [detailId, setDetailId] = useState<string | null>(
     () =>
       window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,
@@ -67,14 +91,24 @@ export default function App() {
       setDetailId(
         window.location.hash.match(/^#\/painel\/([A-Za-z0-9-]+)$/)?.[1] || null,
       );
-      setTab("dashboard");
+      const task =
+        window.location.hash.match(/^#\/tarefa\/([A-Za-z0-9-]+)$/)?.[1] || null;
+      setTaskId(task);
+      setTaskOpenVersion((v) => v + 1);
+      setTab(task ? "tasks" : "dashboard");
+      setMenu(false);
     };
     window.addEventListener("hashchange", changed);
     return () => window.removeEventListener("hashchange", changed);
   }, []);
   useEffect(() => {
     api<User>("/auth/me")
-      .then(setUser)
+      .then((u) => {
+        setUser(u);
+        applyPreferences(u.preferences);
+        if (!window.location.hash) setTab(u.preferences.homepage);
+        else if (window.location.hash.startsWith("#/tarefa/")) setTab("tasks");
+      })
       .catch(() => {})
       .finally(() => setChecking(false));
     const expired = () => {
@@ -84,19 +118,47 @@ export default function App() {
     window.addEventListener("session-expired", expired);
     return () => window.removeEventListener("session-expired", expired);
   }, []);
+  useEffect(() => {
+    const navigate = (e: Event) => {
+      const value = (e as CustomEvent).detail;
+      if (
+        !["dashboard", "daily", "tasks", "agenda", "goals", "account"].includes(
+          value?.tab,
+        )
+      )
+        return;
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+      setDetailId(null);
+      setTaskId(null);
+      setMenu(false);
+      setTab(value.tab);
+      if (
+        ["profile", "preferences", "connections", "security"].includes(
+          value.section,
+        )
+      )
+        setAccountSection(value.section);
+    };
+    window.addEventListener("cc-navigate", navigate);
+    return () => window.removeEventListener("cc-navigate", navigate);
+  }, []);
   async function login(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     setBusy(true);
     setError("");
     try {
-      setUser(
-        await api<User>(
-          "/auth/login",
-          send("POST", { email: f.get("email"), password: f.get("password") }),
-        ),
+      const u = await api<User>(
+        "/auth/login",
+        send("POST", { email: f.get("email"), password: f.get("password") }),
       );
-      setTab("dashboard");
+      setUser(u);
+      applyPreferences(u.preferences);
+      setTab(u.preferences.homepage);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -108,6 +170,7 @@ export default function App() {
     try {
       await api("/auth/logout", { method: "POST" });
       setUser(null);
+      applyPreferences();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -199,6 +262,7 @@ export default function App() {
         window.location.pathname + window.location.search,
       );
     setDetailId(null);
+    setTaskId(null);
     setTab(t);
     setMenu(false);
     setError("");
@@ -233,24 +297,6 @@ export default function App() {
               Espaço privado<small>Seus dados, seu controle</small>
             </span>
           </div>
-          <div className="user-card">
-            <span className="avatar">
-              {user.name.slice(0, 1).toUpperCase()}
-            </span>
-            <div>
-              <strong>{user.name}</strong>
-              <small>{user.email}</small>
-            </div>
-            <button
-              className="icon-button"
-              title="Sair"
-              aria-label="Sair"
-              disabled={busy}
-              onClick={logout}
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
         </div>
       </aside>
       {menu && (
@@ -275,7 +321,9 @@ export default function App() {
             <strong>
               {detailId
                 ? "Detalhes do painel"
-                : nav.find((n) => n.id === tab)?.label}
+                : tab === "account"
+                  ? "Minha conta"
+                  : nav.find((n) => n.id === tab)?.label}
             </strong>
           </div>
           <div className="topbar-tools">
@@ -283,6 +331,15 @@ export default function App() {
             <span className="local-badge">
               <i /> Ambiente local
             </span>
+            <AccountMenu
+              user={user}
+              busy={busy}
+              onLogout={logout}
+              onNavigate={(section) => {
+                setAccountSection(section);
+                go("account");
+              }}
+            />
           </div>
         </header>
         <main className="content">
@@ -300,6 +357,33 @@ export default function App() {
                 id={detailId}
                 onBack={() => go("dashboard")}
                 onSources={() => go("sources")}
+              />
+            </Suspense>
+          ) : tab === "account" ? (
+            <Suspense fallback={<div className="empty">Carregando conta…</div>}>
+              <AccountPage
+                user={user}
+                section={accountSection}
+                onSection={setAccountSection}
+                onUser={(u) => {
+                  setUser(u);
+                  applyPreferences(u.preferences);
+                }}
+              />
+            </Suspense>
+          ) : tab === "goals" ? (
+            <Suspense fallback={<div className="empty">Carregando metas…</div>}>
+              <Goals />
+            </Suspense>
+          ) : tab === "agenda" ? (
+            <Suspense
+              fallback={<div className="empty">Carregando agenda…</div>}
+            >
+              <Agenda
+                onConnections={() => {
+                  setAccountSection("connections");
+                  go("account");
+                }}
               />
             </Suspense>
           ) : tab === "daily" ? (
@@ -329,7 +413,11 @@ export default function App() {
           ) : tab === "reports" ? (
             <Reports />
           ) : (
-            <Management key={tab} section={tab} />
+            <Management
+              key={tab + taskOpenVersion}
+              section={tab}
+              initialTaskId={taskId}
+            />
           )}
         </main>
         <footer>

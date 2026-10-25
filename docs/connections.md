@@ -79,3 +79,26 @@ sudo docker compose up --build -d backend
 ```
 
 Se alterou apenas o callback no GitHub, volte ao Command Center e inicie **Conectar GitHub** novamente. Não reutilize a página de autorização antiga. O aplicativo não consegue verificar nem editar a configuração de uma OAuth App no GitHub em seu nome.
+
+## Google Calendar (0.6)
+
+A conexão é de leitura de perfil e calendários. Eventos externos são consultados na Agenda e abertos no Google para alterações. Compromissos locais são independentes e continuam disponíveis sem conexão.
+
+1. Crie ou selecione um projeto no Google Cloud e habilite a Google Calendar API.
+2. Configure o consentimento OAuth. Em modo de testes, inclua seu e-mail como usuário de teste.
+3. Crie uma credencial OAuth do tipo **Web application**, exclusiva do Command Center.
+4. Em Authorized redirect URIs, cadastre `http://localhost:5173/api/integrations/google/callback` (ou copie a URL efetiva mostrada em Conexões se usar outra origem).
+5. Acrescente ao `.env` local:
+
+```dotenv
+GOOGLE_CLIENT_ID=seu_client_id
+GOOGLE_CLIENT_SECRET=seu_client_secret
+```
+
+6. Recrie os serviços, acesse Perfil → Conexões → Conectar Google Calendar e autorize. Depois abra Agenda. Você pode listar e selecionar um calendário.
+
+Escopos solicitados: `openid email profile https://www.googleapis.com/auth/calendar.readonly`. São usados para identificar a conta autorizada e ler calendários/eventos; isso não cria outro método de login no Command Center. Nunca cole os segredos no chat ou no Git. Tokens permanecem criptografados no servidor, com a mesma chave local das outras conexões.
+
+Aplicativos externos no status Testing podem receber refresh tokens com duração de sete dias; nesse caso será necessário reconectar. Regras organizacionais, consentimento, cotas e disponibilidade da API também se aplicam. Não habilitamos publicação, verificação externa ou deploy automaticamente.
+
+Documentação oficial: [OAuth para servidor web](https://developers.google.com/identity/protocols/oauth2/web-server), [lista de eventos](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), [expiração de tokens](https://developers.google.com/identity/protocols/oauth2/).

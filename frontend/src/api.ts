@@ -1,5 +1,17 @@
+import { formatInstant } from "./userPreferences";
 import { notify, type UndoAction } from "./feedback";
-export type User = { id: string; name: string; email: string };
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+  bio: string;
+  occupation: string;
+  interests: string;
+  has_avatar: boolean;
+  avatar_version: number;
+  preferences: import("./userPreferences").Preferences;
+};
 export type Project = {
   id: string;
   name: string;
@@ -9,6 +21,9 @@ export type Project = {
   created_at: string;
 };
 export type Task = {
+  goal_id: string | null;
+  tags: string[];
+  recurrence: "none" | "daily" | "weekly" | "monthly";
   context: "personal" | "professional" | "general";
   id: string;
   title: string;
@@ -94,6 +109,13 @@ export async function api<T>(
         : method === "POST"
           ? "Registro adicionado"
           : "Alterações salvas";
+    if (path === "/account/profile") title = "Perfil atualizado";
+    if (path === "/account/preferences") title = "Preferências salvas";
+    if (path === "/account/password") title = "Senha atualizada";
+    if (path === "/account/sessions/revoke-others")
+      title = "Outras sessões encerradas";
+    if (path === "/account/avatar")
+      title = method === "DELETE" ? "Foto removida" : "Foto atualizada";
     if (path === "/day") title = "Planejamento salvo";
     if (path === "/day/close") title = "Dia revisado";
     if (path === "/day/reopen") title = "Revisão reaberta";
@@ -140,8 +162,7 @@ export const dateLabel = (value: string | null) =>
   value
     ? new Date(value + "T12:00:00").toLocaleDateString("pt-BR")
     : "Sem prazo";
-export const timeLabel = (value: string) =>
-  new Date(value.endsWith("Z") ? value : value + "Z").toLocaleString("pt-BR");
+export const timeLabel = formatInstant;
 export async function download(path: string, filename: string) {
   const res = await fetch("/api" + path, { credentials: "same-origin" });
   if (!res.ok) {

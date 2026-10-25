@@ -10,4 +10,4 @@ A revisão permite salvar notas e fechar o dia. Fechar preserva uma fotografia d
 
 A revisão de sete dias mostra tarefas atualmente concluídas no período, minutos pessoais registrados e dias fechados. Uma tarefa reaberta deixa de contar como atualmente concluída; não são contados múltiplos eventos de conclusão como entregas independentes. Fechamentos e capturas são privados por usuário.
 
-A agenda desta primeira etapa mostra prazos das tarefas locais. Integração de compromissos de calendário, metas estruturadas e automações continuam como próximas etapas. Tarefas externas do Microsoft Planner/To Do continuam nos cards de leitura, sem serem importadas automaticamente para as prioridades locais. Nenhum recurso depende de IA.
+Meu dia mostra prazos das tarefas locais. As abas Agenda e Metas agora complementam o planejamento; automações em segundo plano continuam como próxima etapa. Tarefas externas do Microsoft Planner/To Do continuam nos cards de leitura, sem serem importadas automaticamente para as prioridades locais. Nenhum recurso depende de IA.

@@ -17,8 +17,12 @@ A aba Meu dia inclui captura rápida, contexto pessoal/profissional, três prior
 3. Executar e conferir backup/restauração local do banco e do volume de arquivos, preservando a chave de criptografia das conexões. O procedimento manual existe; backup automático ainda não foi implementado.
 4. Somente na etapa de publicação: configurar hospedagem, HTTPS, segredos, domínio, monitoramento e operação em produção. O Compose atual continua voltado ao uso local.
 
+## Conta e planejamento (0.6)
+
+Implementados perfil privado, foto, preferências, central de conexões, troca de senha, controle de sessões, etiquetas/filtros e recorrência nas tarefas, metas, agenda local com Google Calendar de leitura e alertas internos. Consulte [o guia de conta e planejamento](perfil-e-planejamento.md). A conexão Google exige cadastrar o aplicativo e autorizar a conta real.
+
 ## Evoluções futuras
 
-Google Calendar; atualização/agendamentos em segundo plano e alertas por condição; agente LangGraph opcional; gerenciamento de contas e permissões pela interface (hoje contas são criadas por CLI); integração GitHub com acesso a repositórios privados. Mensagens de Teams/WhatsApp e outros aplicativos seguem fora da etapa atual por decisão do usuário. Conexões bancárias e conciliação automática não fazem parte do módulo financeiro manual.
+Estimativas de duração de tarefas e blocos de expediente; sincronização/alertas em segundo plano; agente LangGraph opcional; acesso GitHub a repositórios privados; painel administrativo para criar contas e papéis (hoje criação por CLI). Mensagens de Teams/WhatsApp e outros aplicativos seguem fora da etapa atual por decisão do usuário. Conexões bancárias e conciliação automática não fazem parte do módulo financeiro manual.
 
 Estas evoluções não são requisitos pendentes para usar o MVP local. Nenhuma função principal depende de IA, e ainda não houve deploy.

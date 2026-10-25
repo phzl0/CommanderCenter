@@ -75,6 +75,22 @@ export default function WidgetEditor({
       })
       .catch((e) => setError(e.message));
   }, []);
+  async function useInterests() {
+    setError("");
+    try {
+      const user = await api<{ interests: string }>("/account");
+      if (!user.interests)
+        throw Error(
+          "Preencha seus interesses em Ver meu perfil para usá-los no radar.",
+        );
+      setForm((f) => ({
+        ...f,
+        config: { ...f.config, news_keywords: user.interests },
+      }));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   async function searchCompany() {
     setSearching(true);
     setError("");
@@ -335,6 +351,9 @@ export default function WidgetEditor({
                   onChange={(e) => config({ news_keywords: e.target.value })}
                 />
               </label>
+              <button type="button" className="quiet" onClick={useInterests}>
+                Usar interesses do perfil
+              </button>
               <label>
                 Excluir palavras-chave
                 <input

@@ -10,6 +10,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { api, send, dateLabel, type Task } from "./api";
+import { todayInAccount } from "./userPreferences";
 import { dataChanged } from "./feedback";
 type Capture = {
   id: string;
@@ -48,13 +49,7 @@ const contextLabel = (value: string) =>
     : value === "professional"
       ? "Profissional"
       : "Sem contexto";
-const localToday = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const localToday = todayInAccount;
 export default function MyDay({ onTasks }: { onTasks: () => void }) {
   const [day, setDay] = useState(localToday),
     [data, setData] = useState<DayData | null>(null),
@@ -118,6 +113,9 @@ export default function MyDay({ onTasks }: { onTasks: () => void }) {
       project_id,
       due_date,
       context,
+      goal_id,
+      tags,
+      recurrence,
     } = task;
     run(() =>
       api(
@@ -130,6 +128,9 @@ export default function MyDay({ onTasks }: { onTasks: () => void }) {
           project_id,
           due_date,
           context,
+          goal_id,
+          tags,
+          recurrence,
           ...patch,
         }),
       ),

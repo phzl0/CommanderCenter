@@ -26,10 +26,24 @@ const names = {
   tasks: "Tarefas",
   activities: "Atividades",
 };
-export function Management({ section }: { section: Section }) {
+export function Management({
+  section,
+  initialTaskId,
+}: {
+  section: Section;
+  initialTaskId?: string | null;
+}) {
   const [items, setItems] = useState<RecordItem[]>([]),
     [projects, setProjects] = useState<Project[]>([]),
     [tasks, setTasks] = useState<Task[]>([]);
+  const [goals, setGoals] = useState<
+    { id: string; title: string; metric: string }[]
+  >([]);
+  const [contextFilter, setContextFilter] = useState(""),
+    [priorityFilter, setPriorityFilter] = useState(""),
+    [tagFilter, setTagFilter] = useState(""),
+    [fromFilter, setFromFilter] = useState(""),
+    [toFilter, setToFilter] = useState("");
   const [total, setTotal] = useState(0),
     [offset, setOffset] = useState(0),
     [search, setSearch] = useState(""),
@@ -47,7 +61,7 @@ export function Management({ section }: { section: Section }) {
     setLoading(true);
     setError("");
     api<Page<RecordItem>>(
-      `/${section}?offset=${offset}&limit=20&q=${encodeURIComponent(query)}&status=${status}`,
+      `/${section}?offset=${offset}&limit=20&q=${encodeURIComponent(query)}&status=${status}${section === "tasks" ? `&context=${contextFilter}&priority=${priorityFilter}&tag=${encodeURIComponent(tagFilter)}${fromFilter ? "&due_from=" + fromFilter : ""}${toFilter ? "&due_to=" + toFilter : ""}` : ""}`,
     )
       .then((p) => {
         if (live) {
@@ -60,7 +74,18 @@ export function Management({ section }: { section: Section }) {
     return () => {
       live = false;
     };
-  }, [section, offset, query, status, version]);
+  }, [
+    section,
+    offset,
+    query,
+    status,
+    version,
+    contextFilter,
+    priorityFilter,
+    tagFilter,
+    fromFilter,
+    toFilter,
+  ]);
   useEffect(() => {
     Promise.all([
       api<Page<Project>>("/projects?limit=1000"),
@@ -72,6 +97,15 @@ export function Management({ section }: { section: Section }) {
       })
       .catch((e) => setError(e.message));
   }, [version]);
+  useEffect(() => {
+    api<typeof goals>("/planning/goals")
+      .then(setGoals)
+      .catch((e) => setError(e.message));
+    if (section === "tasks" && initialTaskId)
+      api<Task>("/tasks/" + initialTaskId)
+        .then(setEditing)
+        .catch((e) => setError(e.message));
+  }, [section, initialTaskId]);
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -91,6 +125,12 @@ export function Management({ section }: { section: Section }) {
         description: f.get("description"),
         status: f.get("status"),
         priority: f.get("priority"),
+        goal_id: f.get("goal_id") || null,
+        tags: String(f.get("tags") || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        recurrence: f.get("recurrence") || "none",
         context: f.get("context") || "general",
         project_id: f.get("project_id") || null,
         due_date: f.get("due_date") || null,
@@ -127,6 +167,9 @@ export function Management({ section }: { section: Section }) {
         project_id,
         due_date,
         context,
+        goal_id,
+        tags,
+        recurrence,
       } = task;
       await api(
         "/tasks/" + task.id,
@@ -135,6 +178,9 @@ export function Management({ section }: { section: Section }) {
           description,
           status: status === "completed" ? "pending" : "completed",
           context,
+          goal_id,
+          tags,
+          recurrence,
           priority,
           project_id,
           due_date,
@@ -222,6 +268,78 @@ export function Management({ section }: { section: Section }) {
             </select>
           )}
         </div>
+        {section === "tasks" && (
+          <div className="task-filters">
+            <label>
+              Contexto
+              <select
+                aria-label="Filtrar contexto"
+                value={contextFilter}
+                onChange={(e) => {
+                  setContextFilter(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="personal">Pessoal</option>
+                <option value="professional">Profissional</option>
+                <option value="general">Sem contexto</option>
+              </select>
+            </label>
+            <label>
+              Prioridade
+              <select
+                aria-label="Filtrar prioridade"
+                value={priorityFilter}
+                onChange={(e) => {
+                  setPriorityFilter(e.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="">Todas</option>
+                <option value="high">Alta</option>
+                <option value="medium">Média</option>
+                <option value="low">Baixa</option>
+              </select>
+            </label>
+            <label>
+              Etiqueta
+              <input
+                aria-label="Filtrar etiqueta"
+                maxLength={30}
+                value={tagFilter}
+                onChange={(e) => {
+                  setTagFilter(e.target.value);
+                  setOffset(0);
+                }}
+              />
+            </label>
+            <label>
+              Prazo a partir de
+              <input
+                aria-label="Prazo a partir de"
+                type="date"
+                value={fromFilter}
+                onChange={(e) => {
+                  setFromFilter(e.target.value);
+                  setOffset(0);
+                }}
+              />
+            </label>
+            <label>
+              Prazo até
+              <input
+                aria-label="Prazo até"
+                type="date"
+                value={toFilter}
+                onChange={(e) => {
+                  setToFilter(e.target.value);
+                  setOffset(0);
+                }}
+              />
+            </label>
+          </div>
+        )}
         {loading ? (
           <div className="empty">Carregando…</div>
         ) : items.length === 0 ? (
@@ -402,6 +520,56 @@ export function Management({ section }: { section: Section }) {
                     <option value="professional">Profissional</option>
                   </select>
                 </label>
+              )}
+              {section === "tasks" && (
+                <>
+                  <div className="form-grid">
+                    <label>
+                      Meta vinculada
+                      <select
+                        aria-label="Meta vinculada"
+                        name="goal_id"
+                        defaultValue={row?.goal_id || ""}
+                      >
+                        <option value="">Sem meta</option>
+                        {goals
+                          .filter((g) => g.metric === "tasks")
+                          .map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.title}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label>
+                      Repetição
+                      <select
+                        aria-label="Repetição"
+                        name="recurrence"
+                        defaultValue={row?.recurrence || "none"}
+                      >
+                        <option value="none">Não repetir</option>
+                        <option value="daily">Diariamente</option>
+                        <option value="weekly">Semanalmente</option>
+                        <option value="monthly">Mensalmente</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Etiquetas
+                    <input
+                      aria-label="Etiquetas"
+                      name="tags"
+                      maxLength={260}
+                      placeholder="estudos, trabalho · até 8, separadas por vírgula"
+                      defaultValue={row?.tags?.join(", ") || ""}
+                    />
+                  </label>
+                  <small className="form-help">
+                    Ao concluir uma tarefa recorrente, o sistema cria a próxima
+                    ocorrência com prazo futuro.
+                  </small>
+                </>
               )}
               {section !== "projects" && (
                 <label>

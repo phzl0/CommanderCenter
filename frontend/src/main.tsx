@@ -5,6 +5,7 @@ import "./styles.css";
 import "./dark.css";
 import "./reading.css";
 import "./contrast.css";
+import "./account.css";
 createRoot(document.getElementById("root")!).render(
   <>
     <App />

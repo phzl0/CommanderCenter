@@ -1,21 +1,31 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { formatInstant } from "./userPreferences";
 import { confirmAction, dataChanged } from "./feedback";
 type State = {
   configured: boolean;
   connected: boolean;
   account: string | null;
   callback_url?: string;
+  checked_at?: string | null;
+  last_error?: string | null;
+  permissions?: string[];
 };
 export default function AccountConnection({
   provider,
   onRepository,
   onList,
 }: {
-  provider: "github" | "microsoft";
+  provider: "github" | "microsoft" | "google";
   onRepository?: (value: string) => void;
   onList?: (value: string) => void;
 }) {
+  const label =
+    provider === "github"
+      ? "GitHub"
+      : provider === "microsoft"
+        ? "Microsoft 365"
+        : "Google Calendar";
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -89,7 +99,7 @@ export default function AccountConnection({
   }
   return (
     <section className="account-connection">
-      <strong>{provider === "github" ? "GitHub" : "Microsoft 365"}</strong>
+      <strong>{label}</strong>
       <p>
         {state?.connected
           ? `Conectado: ${state.account}`
@@ -101,7 +111,9 @@ export default function AccountConnection({
             Cadastre esta URL de retorno no aplicativo{" "}
             {provider === "github"
               ? "do GitHub (Authorization callback URL)"
-              : "da Microsoft (Redirect URI)"}
+              : provider === "microsoft"
+                ? "da Microsoft (Redirect URI)"
+                : "do Google (Authorized redirect URI)"}
             :
           </small>
           <input
@@ -124,13 +136,36 @@ export default function AccountConnection({
           )}
         </div>
       )}
+      <small>
+        {state?.checked_at
+          ? "Última consulta: " + formatInstant(state.checked_at)
+          : "Nenhuma consulta registrada"}
+      </small>
+      {state?.permissions && (
+        <small>Permissões solicitadas: {state.permissions.join(" · ")}</small>
+      )}
+      {state?.last_error && <p className="error">{state.last_error}</p>}
       <div className="connection-actions">
         {state?.connected ? (
           <>
-            <button type="button" disabled={busy} onClick={() => load()}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                provider === "google"
+                  ? window.dispatchEvent(
+                      new CustomEvent("cc-navigate", {
+                        detail: { tab: "agenda" },
+                      }),
+                    )
+                  : load()
+              }
+            >
               {provider === "github"
                 ? "Listar repositórios"
-                : "Listar listas do To Do"}
+                : provider === "microsoft"
+                  ? "Listar listas do To Do"
+                  : "Ver agenda"}
             </button>
             <button
               type="button"
@@ -147,7 +182,7 @@ export default function AccountConnection({
             disabled={busy || !state}
             onClick={() => (state?.configured ? connect() : setHelp(true))}
           >
-            {provider === "github" ? "Conectar GitHub" : "Conectar Microsoft"}
+            {"Conectar " + (provider === "microsoft" ? "Microsoft" : label)}
           </button>
         )}
       </div>
@@ -157,7 +192,9 @@ export default function AccountConnection({
             Ative a conexão configurando{" "}
             {provider === "github"
               ? "GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET"
-              : "MICROSOFT_CLIENT_ID e MICROSOFT_CLIENT_SECRET"}{" "}
+              : provider === "microsoft"
+                ? "MICROSOFT_CLIENT_ID e MICROSOFT_CLIENT_SECRET"
+                : "GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET"}{" "}
             no .env do servidor. Veja o guia{" "}
             <a
               href="https://github.com/phzl0/CommanderCenter/blob/main/docs/connections.md"
@@ -204,7 +241,9 @@ export default function AccountConnection({
                 Cadastre esta URL de retorno no aplicativo{" "}
                 {provider === "github"
                   ? "do GitHub (Authorization callback URL)"
-                  : "da Microsoft (Redirect URI)"}
+                  : provider === "microsoft"
+                    ? "da Microsoft (Redirect URI)"
+                    : "do Google (Authorized redirect URI)"}
                 :
               </small>
               <input
@@ -228,6 +267,17 @@ export default function AccountConnection({
               )}
             </div>
           )}
+          <small>
+            {state?.checked_at
+              ? "Última consulta: " + formatInstant(state.checked_at)
+              : "Nenhuma consulta registrada"}
+          </small>
+          {state?.permissions && (
+            <small>
+              Permissões solicitadas: {state.permissions.join(" · ")}
+            </small>
+          )}
+          {state?.last_error && <p className="error">{state.last_error}</p>}
           <div className="connection-actions">
             <button
               type="button"
@@ -270,7 +320,9 @@ export default function AccountConnection({
         <small>
           {provider === "github"
             ? "Lista de repositórios públicos aos quais sua conta está associada."
-            : "Somente leitura de perfil e tarefas. Nenhuma conversa ou mensagem é consultada."}
+            : provider === "microsoft"
+              ? "Somente leitura de perfil e tarefas. Nenhuma conversa ou mensagem é consultada."
+              : "Somente leitura de perfil e calendários. Alterações são feitas no Google Calendar."}
         </small>
       )}
       {error && (
