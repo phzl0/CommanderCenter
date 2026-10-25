@@ -412,6 +412,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Gráfico de planilha/ })
     .click();
   dialog = page.getByRole("dialog");
@@ -540,6 +541,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Clima e previsão/ })
     .click();
   dialog = page.getByRole("dialog");
@@ -556,6 +558,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Ações de empresas/ })
     .click();
   dialog = page.getByRole("dialog");
@@ -578,6 +581,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Repositório GitHub/ })
     .click();
   dialog = page.getByRole("dialog");
@@ -597,6 +601,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Ações de empresas/ })
     .click();
   dialog = page.getByRole("dialog");
@@ -610,6 +615,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page
     .getByRole("dialog")
+    .locator(".widget-catalogue")
     .getByRole("button", { name: /Tarefas do Teams/ })
     .click();
   dialog = page.getByRole("dialog");
