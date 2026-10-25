@@ -173,7 +173,7 @@ function WidgetCard({
               type={widget.config.chart_type}
               kind={widget.kind}
               id={widget.id}
-              height={175}
+              height={widget.kind === "tasks" ? 135 : 165}
             />
           ) : (
             <div

@@ -679,3 +679,68 @@ footer {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.workspace {
+  width: calc(100% - 218px);
+}
+.compact-grid .widget-heading {
+  padding: 0;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.compact-grid .widget-kpis {
+  padding: 0;
+  margin: 4px 0 8px;
+  gap: 18px;
+  flex-shrink: 0;
+}
+.compact-grid .widget-provenance {
+  padding: 6px 0;
+  margin-top: auto;
+  flex-shrink: 0;
+  border-color: #303036;
+}
+.compact-grid .card-detail-actions {
+  padding: 8px 0 0;
+  background: transparent;
+  border-color: #303036;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.compact-grid .chart-legend {
+  margin: 4px 0 8px;
+}
+.compact-grid .task-distribution {
+  margin: 0 0 6px;
+  gap: 12px;
+}
+.compact-grid .widget-empty,
+.compact-grid .chart-loading {
+  flex: 1;
+  min-height: 0;
+}
+.compact-grid .widget-heading h2 {
+  margin: 0;
+}
+.compact-grid .widget-chart {
+  padding: 0;
+}
+.compact-grid .weather-view {
+  flex: 1;
+}
+.compact-grid .widget-provenance time {
+  font-size: 10px;
+}
+.compact-grid .card-detail-actions > a:last-child {
+  margin-left: auto;
+}
+@media (max-width: 1000px) {
+  .workspace {
+    width: calc(100% - 190px);
+  }
+}
+@media (max-width: 760px) {
+  .workspace {
+    width: 100%;
+  }
+}

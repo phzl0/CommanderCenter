@@ -432,7 +432,7 @@ export default function App() {
           ) : tab === "imports" ? (
             <DataWorkspace />
           ) : tab === "reports" ? (
-            <Reports />
+            <DataWorkspace />
           ) : (
             <Management
               key={tab + taskOpenVersion}
