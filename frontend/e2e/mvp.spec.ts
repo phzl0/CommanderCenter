@@ -8,6 +8,7 @@ test("private workspace: management, spreadsheet analysis and export", async ({
       .locator(".toast-stack")
       .getByRole("button", { name: "Dispensar notificação", exact: true });
     while (await dismiss.count()) await dismiss.first().click();
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: "test-results/" + name + ".png",
       fullPage: true,
@@ -264,6 +265,12 @@ test("private workspace: management, spreadsheet analysis and export", async ({
   await expect(carousel.locator(".news-title")).toHaveText(
     "Manchete de demonstração",
   );
+  await expect(
+    carousel.getByRole("img", {
+      name: "Manchete de demonstração",
+      exact: true,
+    }),
+  ).toBeVisible();
   await capture("layout-four-desktop");
   await page.getByRole("button", { name: "Personalizar", exact: true }).click();
   await page

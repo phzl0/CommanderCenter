@@ -368,3 +368,21 @@ def test_category_filter_before_limit_and_failed_source_cooldown(
         assert data["status"] == "unavailable" and calls == ["Fonte 6"]
         newsroom.aggregate(db, user, config, start, end, refresh=True)
         assert calls == ["Fonte 6"]
+
+
+def test_feed_images_media_without_type_atom_and_encoded_content():
+    media = b'<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>Foto</title><link>https://example.com/a</link><media:content url="https://example.com/photo.jpg"/></item></channel></rss>'
+    assert (
+        newsroom.parse_feed(media, "https://example.com")[1][0]["image"]
+        == "https://example.com/photo.jpg"
+    )
+    atom = b'<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Foto</title><link href="https://example.com/a"/><link rel="enclosure" type="image/jpeg" href="/photo.jpg"/></entry></feed>'
+    assert (
+        newsroom.parse_feed(atom, "https://example.com")[1][0]["image"]
+        == "https://example.com/photo.jpg"
+    )
+    encoded = b'<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>Foto</title><link>https://example.com/a</link><content:encoded><![CDATA[<p><img src="https://example.com/photo.jpg"></p>]]></content:encoded></item></channel></rss>'
+    assert (
+        newsroom.parse_feed(encoded, "https://example.com")[1][0]["image"]
+        == "https://example.com/photo.jpg"
+    )

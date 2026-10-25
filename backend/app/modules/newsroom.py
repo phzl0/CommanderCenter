@@ -208,6 +208,37 @@ def clean_item(title, url, description="", image="", date=""):
     }
 
 
+def feed_image(node, description, base):
+    for child in node.iter():
+        tag = child.tag.rsplit("}", 1)[-1]
+        image_type = child.get("type", "").startswith("image/")
+        media = child.tag.startswith("{http://search.yahoo.com/mrss/}")
+        if child.get("url") and (
+            tag == "thumbnail"
+            or (
+                tag in ("content", "enclosure")
+                and (image_type or child.get("medium") == "image" or media)
+            )
+        ):
+            return urljoin(base, child.get("url"))
+        if (
+            tag == "link"
+            and child.get("rel") == "enclosure"
+            and image_type
+            and child.get("href")
+        ):
+            return urljoin(base, child.get("href"))
+    for markup in [
+        description,
+        node.findtext("{http://purl.org/rss/1.0/modules/content/}encoded", ""),
+    ]:
+        finder = ImageFinder()
+        finder.feed(markup)
+        if finder.url:
+            return urljoin(base, finder.url)
+    return ""
+
+
 def parse_feed(raw, base):
     try:
         root = ElementTree.fromstring(raw)
@@ -232,13 +263,11 @@ def parse_feed(raw, base):
             description = node.findtext(atom + "summary", "") or node.findtext(
                 atom + "content", ""
             )
-            image_parser = ImageFinder()
-            image_parser.feed(description)
             item = clean_item(
                 node.findtext(atom + "title", ""),
                 urljoin(base, link),
                 description,
-                urljoin(base, image_parser.url) if image_parser.url else "",
+                feed_image(node, description, base),
                 date_text(
                     node.findtext(atom + "published", "")
                     or node.findtext(atom + "updated", "")
@@ -250,24 +279,7 @@ def parse_feed(raw, base):
         title = root.findtext("./channel/title", "")
         for node in root.findall(".//item")[:40]:
             description = node.findtext("description", "")
-            image = ""
-            for child in node.iter():
-                if (
-                    child.tag.rsplit("}", 1)[-1]
-                    in ("thumbnail", "content", "enclosure")
-                    and child.get("url")
-                    and (
-                        child.get("type", "").startswith("image/")
-                        or "thumbnail" in child.tag
-                        or child.get("medium") == "image"
-                    )
-                ):
-                    image = child.get("url")
-                    break
-            if not image:
-                finder = ImageFinder()
-                finder.feed(description)
-                image = finder.url
+            image = feed_image(node, description, base)
             item = clean_item(
                 node.findtext("title", ""),
                 urljoin(base, node.findtext("link", "")),
