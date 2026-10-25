@@ -33,8 +33,8 @@ type Preview = {
 };
 export default function Sources() {
   const [sources, setSources] = useState<Source[]>([]),
-    [mode, setMode] = useState<"sources" | "saved" | "read">("sources"),
-    [articles, setArticles] = useState<NewsItem[]>([]),
+    [mode] = useState("sources"),
+    [emailReady, setEmailReady] = useState(false),
     [editing, setEditing] = useState<Source | null | undefined>(undefined),
     [url, setUrl] = useState(""),
     [preview, setPreview] = useState<Preview | null>(null),
@@ -45,21 +45,14 @@ export default function Sources() {
     setSources(await api<Source[]>("/sources/bootstrap", { method: "POST" }));
   }
   useEffect(() => {
+    api<{ email_configured: boolean }>("/planning/reminders/status")
+      .then((r) => setEmailReady(r.email_configured))
+      .catch((e) => setError(e.message));
     load().catch((e) => setError(e.message));
     const changed = () => load().catch((e) => setError(e.message));
     window.addEventListener("cc-data-changed", changed);
     return () => window.removeEventListener("cc-data-changed", changed);
   }, []);
-  useEffect(() => {
-    if (mode === "sources") return;
-    const loadArticles = () =>
-      api<NewsItem[]>("/sources/articles?mode=" + mode)
-        .then(setArticles)
-        .catch((e) => setError(e.message));
-    loadArticles();
-    window.addEventListener("cc-reading-changed", loadArticles);
-    return () => window.removeEventListener("cc-reading-changed", loadArticles);
-  }, [mode]);
   function edit(source: Source | null) {
     setEditing(source);
     setUrl(source?.url || "");
@@ -145,8 +138,8 @@ export default function Sources() {
       <div className="page-heading">
         <div>
           <span className="eyebrow">INFORMAÇÃO COM ORIGEM</span>
-          <h1>Fontes</h1>
-          <p>Conecte uma vez. Use em quantos painéis fizer sentido.</p>
+          <h1>Fontes e conexões</h1>
+          <p>Gerencie suas fontes e contas.</p>
         </div>
         <button className="primary" onClick={() => edit(null)}>
           <Plus size={16} />
@@ -154,24 +147,6 @@ export default function Sources() {
         </button>
       </div>
       <div className="sources-toolbar">
-        <div className="segment">
-          {[
-            { id: "sources", name: "Minhas fontes" },
-            { id: "saved", name: "Ler depois" },
-            { id: "read", name: "Já lidas" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              className={mode === t.id ? "active" : ""}
-              onClick={() => {
-                setMode(t.id as typeof mode);
-                setError("");
-              }}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
         {mode === "sources" && (
           <div className="search">
             <Search size={15} />
@@ -191,19 +166,6 @@ export default function Sources() {
       )}
       {mode === "sources" ? (
         <>
-          <div className="source-guidance">
-            <Rss size={19} />
-            <div>
-              <strong>
-                Três fontes para começar, liberdade para explorar.
-              </strong>
-              <p>
-                Agência Brasil, G1 e IBGE. Acrescente RSS de futebol, jogos,
-                tecnologia ou outro tema. Um link comum será testado para
-                localizar o feed.
-              </p>
-            </div>
-          </div>
           <div className="source-grid">
             {filtered.map((s) => (
               <article className="panel source-card" key={s.id}>
@@ -267,26 +229,22 @@ export default function Sources() {
               </article>
             ))}
           </div>
-          <p className="muted sources-footnote">
-            Limite de 30 fontes por conta e até 6 fontes por painel. As
-            categorias são livres; crie uma ao editar ou adicionar uma fonte.
-          </p>
         </>
-      ) : articles.length ? (
-        <section className="panel reading-list">
-          <NewsFeed items={articles} />
-        </section>
-      ) : (
-        <section className="panel empty">
-          <Bookmark size={30} />
-          <h3>
-            {mode === "saved"
-              ? "Sua lista de leitura começa aqui"
-              : "Nenhuma notícia lida ainda"}
-          </h3>
-          <p>Use os botões do radar para organizar suas leituras.</p>
-        </section>
-      )}
+      ) : null}
+      <section className="panel email-status">
+        <h2>Lembretes por e-mail</h2>
+        <p>{emailReady ? "Envio configurado" : "Envio não configurado"}</p>
+        {!emailReady && (
+          <details>
+            <summary>Configurar envio</summary>
+            <p>
+              Preencha SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+              e SMTP_SECURITY no .env local e recrie os serviços. Use uma senha
+              de aplicativo do provedor.
+            </p>
+          </details>
+        )}
+      </section>
       {editing !== undefined && (
         <div className="modal-backdrop">
           <section

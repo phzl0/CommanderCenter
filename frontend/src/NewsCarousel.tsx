@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getPreferences, type Preferences } from "./userPreferences";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
 export default function NewsCarousel({ items }: { items: NewsItem[] }) {
@@ -19,7 +19,10 @@ export default function NewsCarousel({ items }: { items: NewsItem[] }) {
   }, [items]);
   useEffect(() => {
     const update = (e: Event) => {
-      if ((e as CustomEvent<Preferences>).detail.reduce_motion) setPaused(true);
+      setPaused(
+        (e as CustomEvent<Preferences>).detail.reduce_motion ||
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      );
     };
     window.addEventListener("cc-preferences", update);
     return () => window.removeEventListener("cc-preferences", update);
@@ -33,7 +36,7 @@ export default function NewsCarousel({ items }: { items: NewsItem[] }) {
     if (paused || hover || focus || hidden || items.length < 2) return;
     const id = window.setInterval(
       () => setIndex((i) => (i + 1) % items.length),
-      7000,
+      2000,
     );
     return () => window.clearInterval(id);
   }, [paused, hover, focus, hidden, items.length]);
@@ -76,13 +79,7 @@ export default function NewsCarousel({ items }: { items: NewsItem[] }) {
         <span>
           {(index % items.length) + 1} / {items.length}
         </span>
-        <button
-          className="icon-button"
-          aria-label={paused ? "Reproduzir notícias" : "Pausar notícias"}
-          onClick={() => setPaused((p) => !p)}
-        >
-          {paused ? <Play size={15} /> : <Pause size={15} />}
-        </button>
+
         <button
           className="icon-button"
           aria-label="Próxima notícia"

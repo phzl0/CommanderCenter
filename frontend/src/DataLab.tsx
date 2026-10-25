@@ -101,6 +101,8 @@ function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
   );
 }
 export function DataLab() {
+  const [fileSearch, setFileSearch] = useState("");
+  const [filePage, setFilePage] = useState(1);
   const [imports, setImports] = useState<ImportItem[]>([]),
     [analyses, setAnalyses] = useState<Analysis[]>([]),
     [selected, setSelected] = useState<ImportItem | null>(null),
@@ -285,13 +287,16 @@ export function DataLab() {
       setBusy(false);
     }
   }
+  const filteredImports = imports.filter((i) =>
+    i.original_name.toLowerCase().includes(fileSearch.toLowerCase()),
+  );
   return (
     <>
       <div className="page-heading">
         <div>
           <span className="eyebrow">DADOS QUE FAZEM SENTIDO</span>
-          <h1>Dados e análises</h1>
-          <p>Transforme suas planilhas em informação útil.</p>
+          <h1>Dados e arquivos</h1>
+          <p>Importe, consulte e gere relatórios.</p>
         </div>
         <button
           className="primary"
@@ -300,7 +305,7 @@ export function DataLab() {
             setError("");
           }}
         >
-          <Upload size={17} /> Importar planilha
+          <Upload size={17} /> Importar arquivo
         </button>
       </div>
       {error && (
@@ -323,8 +328,8 @@ export function DataLab() {
               <div>
                 <h2>{selected.original_name}</h2>
                 <p>
-                  {selected.rows.toLocaleString("pt-BR")} linhas na aba inicial
-                  · {(selected.size_bytes / 1024).toFixed(1)} KB
+                  {selected.rows.toLocaleString("pt-BR")} linhas ·{" "}
+                  {(selected.size_bytes / 1024).toFixed(1)} KB
                 </p>
               </div>
               <button
@@ -340,6 +345,12 @@ export function DataLab() {
                 <Download size={16} /> Original
               </button>
             </div>
+            {selected.format === "pdf" && (
+              <p className="muted">
+                Texto por página. PDFs digitalizados ficam guardados, mas exigem
+                OCR para análise.
+              </p>
+            )}
             <div className="analysis-config">
               <div className="form-grid">
                 <label>
@@ -671,14 +682,23 @@ export function DataLab() {
               </div>
               <span className="badge">{imports.length} arquivos</span>
             </div>
+            <input
+              aria-label="Buscar arquivos"
+              placeholder="Buscar arquivo…"
+              value={fileSearch}
+              onChange={(e) => {
+                setFileSearch(e.target.value);
+                setFilePage(1);
+              }}
+            />
             {loading ? (
               <div className="empty">Carregando…</div>
             ) : imports.length === 0 ? (
               <div className="empty">
                 <FileSpreadsheet size={36} />
-                <h3>Uma planilha. Muitas possibilidades.</h3>
+                <h3>Seus arquivos</h3>
                 <p>
-                  Importe CSV, XLSX ou XLS de até 10 MB.
+                  Importe PDF, CSV, XLSX ou XLS de até 10 MB.
                   <br />
                   Até 50.000 linhas e 100 colunas por aba.
                 </p>
@@ -687,34 +707,55 @@ export function DataLab() {
                 </button>
               </div>
             ) : (
-              imports.map((item) => (
-                <article className="record" key={item.id}>
-                  <div className="record-icon">
-                    <FileSpreadsheet size={22} />
-                  </div>
-                  <div className="record-body">
-                    <h3>{item.original_name}</h3>
-                    <p>
-                      {item.rows.toLocaleString("pt-BR")} linhas ·{" "}
-                      {item.columns.length} colunas ·{" "}
-                      {timeLabel(item.created_at)}
-                    </p>
-                  </div>
-                  <button disabled={busy} onClick={() => open(item)}>
-                    Explorar
-                  </button>
-                  <button
-                    aria-label={"Excluir " + item.original_name}
-                    className="icon-button danger"
-                    disabled={busy}
-                    onClick={() => remove(item)}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </article>
-              ))
+              filteredImports
+                .slice((filePage - 1) * 8, filePage * 8)
+                .map((item) => (
+                  <article className="record" key={item.id}>
+                    <div className="record-icon">
+                      <FileSpreadsheet size={22} />
+                    </div>
+                    <div className="record-body">
+                      <h3>{item.original_name}</h3>
+                      <p>
+                        {item.rows.toLocaleString("pt-BR")} linhas ·{" "}
+                        {item.columns.length} colunas ·{" "}
+                        {timeLabel(item.created_at)}
+                      </p>
+                    </div>
+                    <button disabled={busy} onClick={() => open(item)}>
+                      Explorar
+                    </button>
+                    <button
+                      aria-label={"Excluir " + item.original_name}
+                      className="icon-button danger"
+                      disabled={busy}
+                      onClick={() => remove(item)}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </article>
+                ))
             )}
           </section>
+          {filteredImports.length > 8 && (
+            <div className="pagination">
+              <button
+                disabled={filePage <= 1}
+                onClick={() => setFilePage((p) => p - 1)}
+              >
+                Anterior
+              </button>
+              <span>
+                {filePage} / {Math.ceil(filteredImports.length / 8)}
+              </span>
+              <button
+                disabled={filePage * 8 >= filteredImports.length}
+                onClick={() => setFilePage((p) => p + 1)}
+              >
+                Próxima
+              </button>
+            </div>
+          )}
           <section className="panel saved-analyses">
             <div className="panel-heading">
               <div>
@@ -758,18 +799,18 @@ export function DataLab() {
             aria-modal="true"
             aria-labelledby="upload-title"
           >
-            <h2 id="upload-title">Importar planilha</h2>
+            <h2 id="upload-title">Importar arquivo</h2>
             <p className="muted">
               O original será guardado até você excluí-lo.
             </p>
             <form onSubmit={upload}>
               <label className="file-drop">
                 <Upload size={28} />
-                <span>Escolha um arquivo CSV ou Excel</span>
+                <span>Escolha um PDF, CSV ou Excel</span>
                 <input
                   type="file"
                   name="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".pdf,.csv,.xlsx,.xls"
                   required
                 />
               </label>

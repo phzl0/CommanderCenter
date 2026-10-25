@@ -1,4 +1,7 @@
-# Command Center
+# Command Center 0.7
+
+Interface compacta, calendário com lembretes e dados/arquivos unificados. [Guia desta versão](docs/interface-simples.md).
+
 
 Dashboard privado para gestão de projetos, tarefas, atividades e análise de planilhas. MVP 1 com funcionamento independente de IA. O nome do repositório é `CommanderCenter`; a aplicação usa a marca **Command Center**.
 

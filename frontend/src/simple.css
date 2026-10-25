@@ -1,0 +1,681 @@
+/* Neutral graphite surfaces, restrained blue accent; reference: shadcn/ui Zinc dark. */
+:root {
+  background: #09090b;
+  color: #e4e4e7;
+  --line: #27272a;
+  --muted: #a1a1aa;
+  --blue: #3b82f6;
+}
+body,
+.app,
+.workspace,
+.login-page {
+  background: #09090b;
+  background-image: none;
+}
+.sidebar,
+.topbar {
+  background: #101012;
+  border-color: #27272a;
+  box-shadow: none;
+}
+.panel,
+.intelligence-card,
+.source-card,
+.account-connection {
+  background: #121215;
+  border-color: #2b2b30;
+  box-shadow: none;
+}
+.modal,
+.notification-inbox,
+.login-form,
+.account-menu-popup {
+  background: #18181b;
+  border-color: #3f3f46;
+  box-shadow: 0 16px 48px #0005;
+}
+h1,
+h2,
+h3,
+strong {
+  color: #f4f4f5;
+}
+p,
+small,
+.muted {
+  color: #a1a1aa;
+}
+button {
+  background: #202024;
+  border-color: #3f3f46;
+  color: #e4e4e7;
+  box-shadow: none;
+}
+button:hover {
+  background: #2c2c32;
+  border-color: #52525b;
+}
+button.primary {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: white;
+  box-shadow: none;
+}
+button.primary:hover {
+  background: #1d4ed8;
+  box-shadow: none;
+}
+input,
+select,
+textarea {
+  background: #101013;
+  border-color: #3f3f46;
+  color: #f4f4f5;
+}
+input::placeholder {
+  color: #85858f;
+}
+.segment {
+  background: #18181b;
+  border-color: #303036;
+}
+.segment button.active,
+.sidebar nav button.selected {
+  background: #2563eb20;
+  color: #93c5fd;
+  border-color: #3b82f650;
+  box-shadow: none;
+}
+.content {
+  padding: 20px 28px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+.topbar {
+  height: 58px;
+  min-height: 58px;
+}
+.page-heading,
+.intelligence-heading {
+  margin: 0 0 18px;
+  align-items: center;
+  gap: 14px;
+}
+.page-heading h1,
+.intelligence-heading h1 {
+  font-size: 23px;
+  line-height: 1.25;
+  margin: 0;
+}
+.page-heading p {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.eyebrow,
+.nav-label,
+.private-note,
+.title-dot,
+.radar-bottom,
+.suggestion-note {
+  display: none;
+}
+.intelligence-heading {
+  display: flex;
+  justify-content: space-between;
+}
+.dashboard-actions {
+  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dashboard-actions button {
+  padding: 8px 12px;
+}
+.dashboard-actions .segment button {
+  padding: 8px;
+}
+.intelligence-grid.compact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 16px;
+}
+.compact-grid > .intelligence-card {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-height: 325px;
+  height: 355px;
+  overflow: hidden;
+  padding: 18px;
+}
+.compact-grid > .intelligence-card:nth-child(5) {
+  grid-column: 1/-1 !important;
+}
+.widget-heading {
+  margin-bottom: 12px;
+}
+.widget-heading h2 {
+  font-size: 15px;
+}
+.widget-heading > div > span {
+  font-size: 11px;
+}
+.widget-kpis {
+  margin: 8px 0 14px;
+}
+.widget-kpis strong {
+  font-size: 22px;
+}
+.widget-note,
+.data-date {
+  display: none;
+}
+.widget-provenance {
+  font-size: 10px;
+  margin-top: 8px;
+}
+.card-detail-actions {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.widget-symbol,
+.catalogue-icon {
+  background: #2563eb18 !important;
+  color: #93c5fd !important;
+  box-shadow: none !important;
+}
+.intelligence-card {
+  display: flex;
+  flex-direction: column;
+}
+.widget-empty {
+  min-height: 150px;
+}
+.widget-catalogue p {
+  font-size: 11px;
+}
+.widget-catalogue small {
+  display: none;
+}
+footer {
+  padding: 12px 28px;
+  color: #71717a;
+  font-size: 11px;
+}
+.local-badge {
+  display: none;
+}
+.brand > span:first-child {
+  background: transparent;
+  box-shadow: none;
+}
+.brand img {
+  display: block;
+}
+.brand {
+  font-size: 17px;
+}
+.sidebar {
+  width: 218px;
+}
+.workspace {
+  margin-left: 218px;
+}
+.sidebar nav button {
+  font-size: 13px;
+  padding: 11px 14px;
+}
+.sidebar .brand {
+  margin-bottom: 24px;
+}
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.calendar-panel,
+.selected-day {
+  padding: 20px;
+}
+.calendar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.calendar-heading h2 {
+  font-size: 17px;
+  text-transform: capitalize;
+}
+.calendar-week,
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+.calendar-week span {
+  text-align: center;
+  font-size: 11px;
+  color: #a1a1aa;
+  padding: 8px;
+}
+.calendar-days button {
+  height: 66px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px;
+  border-color: transparent;
+  background: #1b1b20;
+}
+.calendar-days button small {
+  font-size: 9px;
+  color: #93c5fd;
+}
+.calendar-days button.chosen {
+  border-color: #60a5fa;
+  background: #2563eb25;
+}
+.calendar-days button.today strong {
+  color: #60a5fa;
+}
+.calendar-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 0 8px;
+  flex-wrap: wrap;
+}
+.calendar-footer label {
+  margin: 0;
+}
+.selected-day {
+  max-height: calc(100vh - 165px);
+  overflow: auto;
+}
+.selected-day h2 {
+  font-size: 16px;
+}
+.calendar-item {
+  padding: 14px 0;
+  border-bottom: 1px solid #303036;
+}
+.calendar-item h3 {
+  font-size: 14px;
+  margin: 7px 0;
+}
+.calendar-item p {
+  font-size: 12px;
+  margin: 5px 0;
+  white-space: pre-wrap;
+}
+.calendar-item small {
+  font-size: 11px;
+}
+.calendar-item.completed h3 {
+  text-decoration: line-through;
+  color: #85858f;
+}
+.calendar-item-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+.calendar-item-actions button {
+  font-size: 12px;
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  align-items: center;
+  margin: 16px;
+}
+.data-tabs {
+  margin-bottom: 16px;
+  width: fit-content;
+}
+.data-workspace .page-heading h1 {
+  font-size: 20px;
+}
+.table-scroll {
+  max-height: 420px;
+  overflow: auto;
+}
+.table-scroll thead {
+  position: sticky;
+  top: 0;
+  background: #18181b;
+  z-index: 1;
+}
+.analysis-config {
+  max-height: 40vh;
+  overflow: auto;
+}
+.connections-grid {
+  margin-top: 20px;
+}
+.connection-help {
+  background: #101013;
+}
+.account-connection > .connection-help:first-of-type {
+  display: none;
+}
+.account-connection .connection-help:has(p) {
+  display: block;
+}
+.account-connection > small {
+  font-size: 11px;
+}
+.source-grid {
+  gap: 14px;
+}
+.source-card {
+  padding: 16px;
+}
+.source-card h2 {
+  font-size: 15px;
+}
+.source-health {
+  font-size: 11px;
+}
+.news-hero {
+  max-width: 100%;
+  margin-bottom: 18px;
+}
+.news-hero .news-carousel {
+  background: #121215;
+  border: 1px solid #303036;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.news-hero .news-slide .news-feed article {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(250px, 1fr);
+  gap: 24px;
+  border: 0;
+  padding: 0;
+}
+.news-hero .news-visual {
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  width: 100%;
+}
+.news-hero .news-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.news-hero .news-content {
+  padding: 24px 24px 12px 0;
+  align-self: center;
+}
+.news-hero .news-title {
+  font-size: 24px;
+  line-height: 1.3;
+}
+.news-hero .news-content p {
+  display: none;
+}
+.carousel-controls {
+  padding: 8px 12px;
+}
+.headlines {
+  padding: 18px;
+}
+.headlines > h2 {
+  font-size: 17px;
+  margin-bottom: 16px;
+}
+.headlines .news-feed {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.headlines .news-feed article {
+  border: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+}
+.headlines .news-visual {
+  height: 90px;
+  min-height: 90px;
+}
+.headlines .news-title {
+  font-size: 14px;
+}
+.headlines .news-content p {
+  display: none;
+}
+.news-feed article.read {
+  opacity: 1;
+}
+.news-image-placeholder {
+  background: #202027;
+}
+.news-byline span {
+  color: #93c5fd;
+}
+.weather-current {
+  gap: 14px;
+}
+.weather-current strong {
+  font-size: 40px;
+}
+.weather-facts {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  margin: 8px 0;
+}
+.weather-hours {
+  display: flex;
+  overflow: auto;
+  gap: 16px;
+  padding: 10px 0;
+  scrollbar-width: thin;
+}
+.weather-hours > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 40px;
+  font-size: 11px;
+}
+.weather-hours small {
+  color: #93c5fd;
+  font-size: 10px;
+}
+.compact-grid .weather-days,
+.compact-grid .weather-timestamp {
+  display: none;
+}
+.compact-grid .weather-view {
+  overflow: hidden;
+}
+.weather-days > div {
+  background: #1c1c21;
+  border-color: #303036;
+}
+.weather-big-icon {
+  color: #93c5fd;
+  background: transparent;
+  box-shadow: none;
+}
+@media (min-width: 1500px) {
+  .compact-grid > .intelligence-card {
+    height: 370px;
+  }
+  .calendar-days button {
+    height: 78px;
+  }
+}
+@media (max-width: 1000px) {
+  .sidebar {
+    width: 190px;
+  }
+  .workspace {
+    margin-left: 190px;
+  }
+  .content {
+    padding: 18px;
+  }
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+  .selected-day {
+    max-height: 440px;
+  }
+  .calendar-days button {
+    height: 60px;
+  }
+  .calendar-count-label {
+    display: none;
+  }
+  .news-hero .news-title {
+    font-size: 20px;
+  }
+  .headlines .news-feed {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar {
+    width: 240px;
+  }
+  .workspace {
+    margin-left: 0;
+  }
+  .content {
+    padding: 14px;
+  }
+  .topbar {
+    padding: 0 14px;
+  }
+  .intelligence-heading {
+    flex-wrap: wrap;
+  }
+  .dashboard-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .intelligence-grid.compact-grid {
+    grid-template-columns: 1fr;
+  }
+  .compact-grid > .intelligence-card:nth-child(5) {
+    grid-column: auto !important;
+  }
+  .page-heading {
+    flex-wrap: wrap;
+  }
+  .calendar-panel,
+  .selected-day {
+    padding: 12px;
+  }
+  .calendar-days {
+    gap: 3px;
+  }
+  .calendar-days button {
+    padding: 7px;
+    height: 52px;
+  }
+  .calendar-days button strong {
+    font-size: 12px;
+  }
+  .news-hero .news-slide .news-feed article {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .news-hero .news-visual {
+    height: 200px;
+    min-height: 200px;
+  }
+  .news-hero .news-content {
+    padding: 16px;
+  }
+  .news-hero .news-title {
+    font-size: 18px;
+  }
+  .connections-grid {
+    grid-template-columns: 1fr;
+  }
+  .calendar-layout {
+    gap: 12px;
+  }
+}
+
+.news-feed article {
+  background: #18181b;
+  border-color: #303036;
+}
+.news-hero .news-feed {
+  padding: 0;
+}
+.news-hero .news-slide {
+  overflow: hidden;
+}
+.email-status {
+  padding: 18px;
+  margin-top: 18px;
+}
+.email-status h2 {
+  font-size: 16px;
+}
+.email-status p,
+.email-status details {
+  font-size: 12px;
+}
+.selected-day,
+.calendar-panel,
+.data-workspace,
+.news-hero {
+  min-width: 0;
+}
+
+.compact-grid > .intelligence-card {
+  height: 370px;
+}
+.compact-grid .weather-view {
+  padding: 0;
+  min-height: 0;
+}
+.compact-grid .weather-current {
+  padding: 0;
+}
+.compact-grid .weather-current p {
+  margin: 0;
+}
+.compact-grid .weather-facts {
+  margin: 5px 0;
+}
+.compact-grid .weather-hours {
+  padding: 8px 0;
+  gap: 14px;
+}
+.compact-grid .weather-current strong {
+  line-height: 1.2;
+}
+.compact-grid .weather-hours > div {
+  gap: 4px;
+}
+.news-hero .news-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.headlines .news-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

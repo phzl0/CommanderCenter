@@ -1,7 +1,5 @@
 import { test, expect } from "@playwright/test";
-test("private profile preferences recurring goals agenda and security", async ({
-  page,
-}) => {
+test("private profile preferences and security", async ({ page }) => {
   test.setTimeout(150000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -90,7 +88,7 @@ test("private profile preferences recurring goals agenda and security", async ({
   await menu("Preferências");
   await page
     .getByLabel("Página inicial", { exact: true })
-    .selectOption("daily");
+    .selectOption("dashboard");
   await page.getByLabel("Fuso horário", { exact: true }).selectOption("UTC");
   await page
     .getByLabel("Tamanho do texto", { exact: true })
@@ -109,78 +107,11 @@ test("private profile preferences recurring goals agenda and security", async ({
   await expect(page.locator("html")).toHaveAttribute("data-font-size", "large");
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Meu dia", exact: true }),
+    page.getByRole("heading", { name: "Visão geral", exact: true }),
   ).toBeVisible();
-  const nav = page.getByRole("navigation", { name: "Navegação principal" });
-  await nav.getByRole("button", { name: "Metas", exact: true }).click();
-  await page.getByRole("button", { name: "Nova meta", exact: true }).click();
-  let dialog = page.getByRole("dialog");
-  await dialog
-    .getByLabel("Título da meta", { exact: true })
-    .fill("Estudar documentação");
-  await dialog.getByLabel("Valor alvo", { exact: true }).fill("1");
-  await dialog
-    .getByRole("button", { name: "Salvar meta", exact: true })
-    .click();
-  await nav.getByRole("button", { name: "Tarefas", exact: true }).click();
-  await page.getByRole("button", { name: "Nova tarefa", exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Título", { exact: true }).fill("Ler documentação");
-  await dialog
-    .getByLabel("Meta vinculada", { exact: true })
-    .selectOption({ label: "Estudar documentação" });
-  await dialog.getByLabel("Repetição", { exact: true }).selectOption("weekly");
-  await dialog
-    .getByLabel("Etiquetas", { exact: true })
-    .fill("estudo, trabalho");
-  const day = new Date().toISOString().slice(0, 10);
-  await dialog.getByLabel("Prazo", { exact: true }).fill(day);
-  await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Ler documentação", exact: true }),
-  ).toBeVisible();
-  await page.getByLabel("Filtrar etiqueta", { exact: true }).fill("estudo");
-  await expect(
-    page.getByRole("heading", { name: "Ler documentação", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Concluir tarefa", exact: true })
-    .click();
-  const tasks = await (await page.request.get("/api/tasks")).json();
-  expect(
-    tasks.items.filter(
-      (t: { title: string }) => t.title === "Ler documentação",
-    ),
-  ).toHaveLength(2);
-  await nav.getByRole("button", { name: "Metas", exact: true }).click();
-  await expect(
-    page.getByRole("progressbar", {
-      name: "Progresso de Estudar documentação",
-      exact: true,
-    }),
-  ).toHaveAttribute("aria-valuenow", "100");
-  await capture("goals-desktop");
-  await nav.getByRole("button", { name: "Agenda", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Novo compromisso", exact: true })
-    .click();
-  dialog = page.getByRole("dialog");
-  await dialog
-    .getByLabel("Título do compromisso", { exact: true })
-    .fill("Planejamento pessoal");
-  await dialog.getByLabel("Início", { exact: true }).fill(day + "T09:00");
-  await dialog.getByLabel("Fim", { exact: true }).fill(day + "T10:30");
-  await dialog
-    .getByRole("button", { name: "Salvar compromisso", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Planejamento pessoal", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".agenda-stats")).toContainText("90");
-  await capture("agenda-desktop");
   await menu("Conexões");
   await expect(
-    page.getByRole("heading", { name: "Conexões", exact: true }),
+    page.getByRole("heading", { name: "Fontes e conexões", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Conectar Google Calendar", exact: true }),
@@ -216,7 +147,7 @@ test("private profile preferences recurring goals agenda and security", async ({
     .getByRole("button", { name: "Entrar no meu espaço", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Meu dia", exact: true }),
+    page.getByRole("heading", { name: "Visão geral", exact: true }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await menu("Ver meu perfil");

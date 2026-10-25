@@ -173,7 +173,7 @@ function WidgetCard({
               type={widget.config.chart_type}
               kind={widget.kind}
               id={widget.id}
-              height={150}
+              height={175}
             />
           ) : (
             <div
@@ -192,7 +192,7 @@ function WidgetCard({
               </h3>
               <p>
                 {data?.status === "empty"
-                  ? "Ainda não há registros para este recorte. Seus dados aparecerão aqui quando estiverem disponíveis."
+                  ? "Sem registros neste período."
                   : data?.message}
               </p>
               {data?.status !== "unavailable" && (
@@ -257,11 +257,6 @@ function WidgetCard({
           {data?.data_date && (
             <p className="data-date">Último dado: {data.data_date}</p>
           )}
-          {data?.message &&
-            data.status !== "needs_config" &&
-            data.status !== "unavailable" && (
-              <p className="widget-note">{data.message}</p>
-            )}
         </>
       )}
       <div className="card-detail-actions">
@@ -293,10 +288,9 @@ function WidgetCard({
     </section>
   );
 }
-export default function Intelligence({ user }: { user: User }) {
+export default function Intelligence({}: { user: User }) {
   const [widgets, setWidgets] = useState<Widget[]>([]),
     [days, setDays] = useState(30),
-    [cardLimit, setCardLimit] = useState(4),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState(""),
     [customizing, setCustomizing] = useState(false),
@@ -314,7 +308,7 @@ export default function Intelligence({ user }: { user: User }) {
     }>("/intelligence/bootstrap", { method: "POST" });
     setWidgets(r.widgets);
     setDays(r.days);
-    setCardLimit(r.card_limit);
+
     setLoaded(true);
   }
   useEffect(() => {
@@ -332,22 +326,8 @@ export default function Intelligence({ user }: { user: User }) {
     window.addEventListener("cc-data-changed", changed);
     return () => window.removeEventListener("cc-data-changed", changed);
   }, []);
-  const active = widgets.filter((w) => w.visible);
-  const primaryNews = active.find((w) => w.kind === "news");
-  const ordered =
-    cardLimit >= 3 && primaryNews
-      ? active.filter((w) => w.id !== primaryNews.id)
-      : active;
-  const visible = ordered.slice(
-    0,
-    cardLimit - (cardLimit >= 3 && primaryNews ? 1 : 0),
-  );
-  if (cardLimit >= 3 && primaryNews)
-    visible.splice(Math.min(2, visible.length), 0, primaryNews);
-  const hasNewsSlot = visible.length >= 3 && visible[2].kind === "news";
-  const publicSources = visible.filter((w) =>
-    ["github", "news", "macro", "stock", "weather", "teams"].includes(w.kind),
-  ).length;
+  const active = widgets.filter((w) => w.visible && w.kind !== "news");
+  const visible = active.slice(0, 5);
   async function saveWidget(w: Widget, patch: Partial<WidgetInput>) {
     setBusy(true);
     setError("");
@@ -365,8 +345,15 @@ export default function Intelligence({ user }: { user: User }) {
     }
   }
   async function move(index: number, delta: number) {
-    const next = [...widgets];
-    [next[index], next[index + delta]] = [next[index + delta], next[index]];
+    const movable = widgets.filter((w) => w.kind !== "news");
+    [movable[index], movable[index + delta]] = [
+      movable[index + delta],
+      movable[index],
+    ];
+    let cursor = 0;
+    const next = widgets.map((w) =>
+      w.kind === "news" ? w : movable[cursor++],
+    );
     setBusy(true);
     try {
       await api(
@@ -408,74 +395,35 @@ export default function Intelligence({ user }: { user: User }) {
       setBusy(false);
     }
   }
-  async function limit(value: number) {
-    setBusy(true);
-    try {
-      await api("/intelligence/settings", send("PUT", { card_limit: value }));
-      setCardLimit(value);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <>
       <div className="intelligence-heading">
-        <div>
-          <span className="eyebrow">
-            <span className="live-dot" /> INTELLIGENCE WORKSPACE
-          </span>
-          <h1>
-            Visão geral<span className="title-dot">.</span>
-          </h1>
-          <p>
-            Olá, {user.name.split(" ")[0]}. Um olhar sobre o que move seu mundo.
-          </p>
-        </div>
+        <h1>Visão geral</h1>
         <div className="dashboard-actions">
+          <div
+            className="segment"
+            role="group"
+            aria-label="Período dos gráficos"
+          >
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                className={days === d ? "active" : ""}
+                disabled={busy}
+                onClick={() => period(d)}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
           <button onClick={() => setRecording(true)}>
-            <Plus size={16} /> Registrar dados
+            <Plus size={16} />
+            Registrar dado
           </button>
           <button className="primary" onClick={() => setCustomizing(true)}>
-            <SlidersHorizontal size={16} /> Personalizar
+            <SlidersHorizontal size={16} />
+            Personalizar
           </button>
-        </div>
-      </div>
-      <div className="workspace-status">
-        <span>
-          <Sparkles size={15} /> Seu espaço, suas prioridades
-        </span>
-        <div>
-          <span>
-            <b>{visible.length}</b> painéis ativos
-          </span>
-          <span>
-            <b>{publicSources}</b> fontes públicas
-          </span>
-          <span className="private-indicator">DADOS PRIVADOS</span>
-        </div>
-      </div>
-      <div className="dashboard-toolbar">
-        <div>
-          <span className="section-marker" /> SEU RADAR{" "}
-          <small>Informação organizada para acompanhar sua evolução</small>
-        </div>
-        <div
-          className="segment period-selector"
-          role="group"
-          aria-label="Período dos gráficos"
-        >
-          {[7, 30, 90].map((d) => (
-            <button
-              key={d}
-              className={days === d ? "active" : ""}
-              disabled={busy}
-              onClick={() => period(d)}
-            >
-              {d} dias
-            </button>
-          ))}
         </div>
       </div>
       {error && (
@@ -497,12 +445,7 @@ export default function Intelligence({ user }: { user: User }) {
           </button>
         </div>
       ) : (
-        <div
-          className={
-            "intelligence-grid fixed-layout " +
-            (hasNewsSlot ? "has-news-slot" : "")
-          }
-        >
+        <div className={"intelligence-grid compact-grid"}>
           {visible.map((w) => (
             <WidgetCard
               key={w.id}
@@ -515,15 +458,6 @@ export default function Intelligence({ user }: { user: User }) {
           ))}
         </div>
       )}
-      <div className="radar-bottom">
-        <Database size={15} />
-        <span>
-          Dados reais, fontes identificadas. Você decide o que acompanhar.
-        </span>
-        <button className="quiet" onClick={() => setCustomizing(true)}>
-          Explorar painéis <ArrowUpRight size={14} />
-        </button>
-      </div>
       {customizing && (
         <div className="modal-backdrop">
           <section
@@ -546,121 +480,108 @@ export default function Intelligence({ user }: { user: User }) {
               </button>
             </div>
             <p className="muted">
-              Adicione tipos repetidos e organize até 12 painéis. O primeiro
-              radar de notícias fica na lateral; o último card ocupa a largura
-              inferior. Seus cards fora do limite são mantidos.
+              Até cinco cards. Notícias ficam na aba própria.
             </p>
-            <label className="card-limit-setting">
-              Quantidade de cards na visão geral
-              <select
-                aria-label="Quantidade de cards"
-                value={cardLimit}
-                disabled={busy}
-                onChange={(e) => limit(Number(e.target.value))}
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {i + 1}
-                    {i === 3 ? " (padrão)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
             <div className="widget-management">
-              {widgets.map((w, i) => {
-                const Icon = icons[w.kind];
-                return (
-                  <div key={w.id}>
-                    <Icon size={17} />
-                    <span>
-                      <strong>{w.title}</strong>
-                      <small>
-                        {catalogue.find((c) => c.kind === w.kind)?.name}
-                        {w.visible && !visible.some((v) => v.id === w.id)
-                          ? " · Fora do limite atual"
-                          : ""}
-                      </small>
-                    </span>
-                    <button
-                      className="icon-button"
-                      aria-label={
-                        (w.visible ? "Ocultar " : "Mostrar ") + w.title
-                      }
-                      title={w.visible ? "Ocultar" : "Mostrar"}
-                      disabled={busy}
-                      onClick={() => saveWidget(w, { visible: !w.visible })}
-                    >
-                      {w.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={"Subir " + w.title}
-                      disabled={busy || i === 0}
-                      onClick={() => move(i, -1)}
-                    >
-                      <ArrowUp size={15} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={"Descer " + w.title}
-                      disabled={busy || i === widgets.length - 1}
-                      onClick={() => move(i, 1)}
-                    >
-                      <ArrowDown size={15} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      aria-label={"Editar " + w.title}
-                      onClick={() => {
-                        setCustomizing(false);
-                        setEditor({ widget: w });
-                      }}
-                    >
-                      <Settings2 size={16} />
-                    </button>
-                    <button
-                      className="icon-button danger"
-                      aria-label={"Remover " + w.title}
-                      disabled={busy}
-                      onClick={() => remove(w)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                );
-              })}
+              {widgets
+                .filter((w) => w.kind !== "news")
+                .map((w, i) => {
+                  const Icon = icons[w.kind];
+                  return (
+                    <div key={w.id}>
+                      <Icon size={17} />
+                      <span>
+                        <strong>{w.title}</strong>
+                        <small>
+                          {catalogue.find((c) => c.kind === w.kind)?.name}
+                          {w.visible && !visible.some((v) => v.id === w.id)
+                            ? " · Fora do limite atual"
+                            : ""}
+                        </small>
+                      </span>
+                      <button
+                        className="icon-button"
+                        aria-label={
+                          (w.visible ? "Ocultar " : "Mostrar ") + w.title
+                        }
+                        title={w.visible ? "Ocultar" : "Mostrar"}
+                        disabled={busy || (!w.visible && active.length >= 5)}
+                        onClick={() => saveWidget(w, { visible: !w.visible })}
+                      >
+                        {w.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label={"Subir " + w.title}
+                        disabled={busy || i === 0}
+                        onClick={() => move(i, -1)}
+                      >
+                        <ArrowUp size={15} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label={"Descer " + w.title}
+                        disabled={
+                          busy ||
+                          i ===
+                            widgets.filter((w) => w.kind !== "news").length - 1
+                        }
+                        onClick={() => move(i, 1)}
+                      >
+                        <ArrowDown size={15} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label={"Editar " + w.title}
+                        onClick={() => {
+                          setCustomizing(false);
+                          setEditor({ widget: w });
+                        }}
+                      >
+                        <Settings2 size={16} />
+                      </button>
+                      <button
+                        className="icon-button danger"
+                        aria-label={"Remover " + w.title}
+                        disabled={busy}
+                        onClick={() => remove(w)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
             <h3 className="catalogue-title">Adicionar uma fonte</h3>
             <div className="widget-catalogue">
-              {catalogue.map((c) => {
-                const Icon = icons[c.kind];
-                return (
-                  <button
-                    key={c.kind}
-                    disabled={busy || widgets.length >= 12}
-                    onClick={() => {
-                      setCustomizing(false);
-                      setEditor({ kind: c.kind });
-                    }}
-                  >
-                    <span className={"catalogue-icon " + c.kind}>
-                      <Icon size={20} />
-                    </span>
-                    <strong>{c.name}</strong>
-                    <p>{c.description}</p>
-                    <small>
-                      {c.tag}
-                      <Plus size={13} />
-                    </small>
-                  </button>
-                );
-              })}
+              {catalogue
+                .filter((c) => c.kind !== "news")
+                .map((c) => {
+                  const Icon = icons[c.kind];
+                  return (
+                    <button
+                      key={c.kind}
+                      disabled={
+                        busy || active.length >= 5 || widgets.length >= 12
+                      }
+                      onClick={() => {
+                        setCustomizing(false);
+                        setEditor({ kind: c.kind });
+                      }}
+                    >
+                      <span className={"catalogue-icon " + c.kind}>
+                        <Icon size={20} />
+                      </span>
+                      <strong>{c.name}</strong>
+                      <p>{c.description}</p>
+                      <small>
+                        {c.tag}
+                        <Plus size={13} />
+                      </small>
+                    </button>
+                  );
+                })}
             </div>
-            <p className="suggestion-note">
-              <Sparkles size={14} /> Sugestões: acompanhe estudos e hábitos,
-              evolução das entregas, orçamento pessoal e indicadores próprios em
-              planilhas.
-            </p>
           </section>
         </div>
       )}

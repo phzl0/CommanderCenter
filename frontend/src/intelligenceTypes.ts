@@ -76,6 +76,14 @@ export type ChartData = {
     wind: number | null;
     time: string;
     timezone: string;
+    humidity?: number | null;
+    precipitation?: number | null;
+    hours?: {
+      time: string;
+      temperature: number | null;
+      rain: number | null;
+      code: number | null;
+    }[];
     days: {
       date: string;
       code: number;

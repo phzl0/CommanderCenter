@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Plus, RefreshCw, X, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { api, send, dateLabel } from "./api";
 import { confirmAction } from "./feedback";
 import {
@@ -7,30 +7,32 @@ import {
   formatInstant,
   getPreferences,
 } from "./userPreferences";
-type Event = {
+type Item = {
   id: string;
   title: string;
   notes?: string;
   start_at: string;
   end_at: string;
-  all_day?: boolean;
   source: "local" | "google";
-  context?: string;
+  all_day?: boolean;
   link?: string;
+  context?: string;
+  kind?: "appointment" | "todo" | "notice";
+  completed?: boolean;
+  reminder_minutes?: number | null;
+  notify_system?: boolean;
+  notify_email?: boolean;
+  email_error?: string;
+  email_sent_at?: string;
 };
 type Result = {
-  day: string;
-  timezone: string;
-  events: Event[];
+  events: Item[];
   tasks: { id: string; title: string }[];
-  busy_minutes: number;
-  capacity_minutes: number;
-  remaining_minutes: number;
-  limited: boolean;
   errors: string[];
-  note: string;
+  limited: boolean;
 };
-function formTime(value: string) {
+const kinds = { appointment: "Compromisso", todo: "Afazer", notice: "Aviso" };
+function localTime(value: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: getPreferences().timezone,
     year: "numeric",
@@ -40,31 +42,44 @@ function formTime(value: string) {
     minute: "2-digit",
     hourCycle: "h23",
   }).formatToParts(new Date(value));
-  const part = (key: string) => parts.find((p) => p.type === key)!.value;
-  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+  const p = (k: string) => parts.find((v) => v.type === k)!.value;
+  return `${p("year")}-${p("month")}-${p("day")}T${p("hour")}:${p("minute")}`;
+}
+function dateKey(y: number, m: number, d: number) {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 export default function Agenda({
   onConnections,
+  initialDay,
 }: {
   onConnections: () => void;
+  initialDay?: string;
 }) {
-  const [day, setDay] = useState(todayInAccount),
+  const [day, setDay] = useState(initialDay || todayInAccount()),
+    [month, setMonth] = useState(() =>
+      (initialDay || todayInAccount()).slice(0, 7),
+    ),
+    [counts, setCounts] = useState<Record<string, number>>({}),
     [data, setData] = useState<Result | null>(null),
-    [google, setGoogle] = useState(false),
-    [connected, setConnected] = useState(false),
-    [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]),
-    [calendarId, setCalendarId] = useState("primary"),
-    [editing, setEditing] = useState<Event | null | undefined>(undefined),
+    [editing, setEditing] = useState<Item | null | undefined>(undefined),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [version, setVersion] = useState(0);
+    [version, setVersion] = useState(0),
+    [google, setGoogle] = useState(false),
+    [connected, setConnected] = useState(false),
+    [emailReady, setEmailReady] = useState(false);
+  const [year, monthNumber] = month.split("-").map(Number),
+    m = monthNumber - 1;
   useEffect(() => {
     let live = true;
-    api<{ google?: { connected: boolean } }>("/integrations")
-      .then((r) => {
+    Promise.all([
+      api<{ google?: { connected: boolean } }>("/integrations"),
+      api<{ email_configured: boolean }>("/planning/reminders/status"),
+    ])
+      .then(([i, s]) => {
         if (live) {
-          setConnected(!!r.google?.connected);
-          setGoogle(!!r.google?.connected);
+          setConnected(!!i.google?.connected);
+          setEmailReady(s.email_configured);
         }
       })
       .catch((e) => live && setError(e.message));
@@ -75,15 +90,39 @@ export default function Agenda({
   useEffect(() => {
     let live = true;
     setError("");
-    api<Result>(
-      `/planning/agenda?day=${day}&include_google=${google}&calendar_id=${encodeURIComponent(calendarId)}`,
-    )
+    setData(null);
+    api<Result>(`/planning/agenda?day=${day}&include_google=${google}`)
       .then((r) => live && setData(r))
       .catch((e) => live && setError(e.message));
     return () => {
       live = false;
     };
-  }, [day, google, calendarId, version]);
+  }, [day, google, version]);
+  useEffect(() => {
+    let live = true;
+    api<{ days: Record<string, number> }>(
+      `/planning/month?year=${year}&month=${monthNumber}`,
+    )
+      .then((r) => live && setCounts(r.days))
+      .catch((e) => live && setError(e.message));
+    return () => {
+      live = false;
+    };
+  }, [year, monthNumber, version]);
+  useEffect(() => {
+    const navigate = (e: Event) => {
+      const value = (e as CustomEvent).detail;
+      if (
+        value.tab === "agenda" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(value.day || "")
+      ) {
+        setDay(value.day);
+        setMonth(value.day.slice(0, 7));
+      }
+    };
+    window.addEventListener("cc-navigate", navigate);
+    return () => window.removeEventListener("cc-navigate", navigate);
+  }, []);
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -107,230 +146,265 @@ export default function Agenda({
           notes: f.get("notes"),
           start_at: f.get("start_at"),
           end_at: f.get("end_at"),
-          context: f.get("context"),
+          context: editing?.context || "personal",
+          kind: f.get("kind"),
+          completed: editing?.completed || false,
+          reminder_minutes:
+            f.get("reminder_minutes") === ""
+              ? null
+              : Number(f.get("reminder_minutes")),
+          notify_system: f.get("notify_system") === "on",
+          notify_email: f.get("notify_email") === "on",
         }),
       );
       setEditing(undefined);
     });
   }
+  useEffect(() => {
+    if (initialDay) {
+      setDay(initialDay);
+      setMonth(initialDay.slice(0, 7));
+    }
+  }, [initialDay]);
+  const leading = (new Date(year, m, 1).getDay() + 6) % 7,
+    total = new Date(year, m + 1, 0).getDate(),
+    today = todayInAccount();
+  function shift(delta: number) {
+    const next = new Date(year, m + delta, 1);
+    if (next.getFullYear() < 2000 || next.getFullYear() > 2100) return;
+    setMonth(dateKey(next.getFullYear(), next.getMonth(), 1).slice(0, 7));
+  }
   return (
     <>
       <div className="page-heading">
-        <div>
-          <span className="eyebrow">COMPROMISSOS · PRAZOS · CAPACIDADE</span>
-          <h1>Agenda</h1>
-          <p>
-            Veja compromissos com horário junto das tarefas que vencem no dia.
-          </p>
-        </div>
-        <div className="agenda-actions">
-          <button onClick={() => setVersion((v) => v + 1)}>
-            <RefreshCw size={15} />
-            Atualizar agenda
-          </button>
-          <button className="primary" onClick={() => setEditing(null)}>
-            <Plus size={15} />
-            Novo compromisso
-          </button>
-        </div>
+        <h1>Agenda</h1>
+        <button className="primary" onClick={() => setEditing(null)}>
+          <Plus size={16} />
+          Novo registro
+        </button>
       </div>
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      <section className="panel agenda-toolbar">
-        <label>
-          Dia da agenda
-          <input
-            aria-label="Dia da agenda"
-            type="date"
-            min="2000-01-01"
-            max="2100-12-31"
-            value={day}
-            onChange={(e) => {
-              if (e.target.value) setDay(e.target.value);
-            }}
-          />
-        </label>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={google}
-            disabled={!connected}
-            onChange={(e) => setGoogle(e.target.checked)}
-          />
-          Incluir Google Calendar
-        </label>
-        {connected ? (
-          <>
+      <div className="calendar-layout">
+        <section className="panel calendar-panel">
+          <div className="calendar-heading">
             <button
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  const r = await api<{
-                    items: typeof calendars;
-                    limited: boolean;
-                  }>("/planning/calendars");
-                  setCalendars(r.items);
-                })
-              }
+              className="icon-button"
+              aria-label="Mês anterior"
+              onClick={() => shift(-1)}
             >
-              Listar calendários
+              <ChevronLeft size={18} />
             </button>
-            <select
-              aria-label="Calendário Google"
-              value={calendarId}
-              onChange={(e) => setCalendarId(e.target.value)}
+            <h2>
+              {new Date(year, m, 1).toLocaleDateString("pt-BR", {
+                month: "long",
+                year: "numeric",
+              })}
+            </h2>
+            <button
+              className="icon-button"
+              aria-label="Próximo mês"
+              onClick={() => shift(1)}
             >
-              <option value="primary">Calendário principal</option>
-              {calendars.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </>
-        ) : (
-          <button className="quiet" onClick={onConnections}>
-            Conectar Google Calendar
-          </button>
-        )}
-      </section>
-      {data ? (
-        <>
-          <div className="day-stats agenda-stats">
-            <div>
-              <span>Compromissos</span>
-              <strong>{data.events.length}</strong>
-            </div>
-            <div>
-              <span>Minutos ocupados</span>
-              <strong>{data.busy_minutes}</strong>
-            </div>
-            <div>
-              <span>Referência diária</span>
-              <strong>{data.capacity_minutes} min</strong>
-            </div>
-            <div>
-              <span>Disponível na referência</span>
-              <strong>{data.remaining_minutes} min</strong>
-            </div>
+              <ChevronRight size={18} />
+            </button>
           </div>
-          {data.errors.map((e) => (
-            <div className="error" role="alert" key={e}>
-              {e}
-            </div>
-          ))}
-          <div className="day-grid">
-            <section className="panel agenda-events">
-              <div className="day-panel-heading">
-                <CalendarDays size={20} />
-                <div>
-                  <h2>Compromissos do dia</h2>
-                  <p>
-                    {dateLabel(day)} · {data.timezone}
-                  </p>
-                </div>
-              </div>
-              {data.events.length ? (
-                data.events.map((event) => (
+          <div className="calendar-week">
+            {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="calendar-days">
+            {Array.from({ length: leading }, (_, i) => (
+              <span key={"empty" + i} />
+            ))}
+            {Array.from({ length: total }, (_, i) => {
+              const date = dateKey(year, m, i + 1);
+              return (
+                <button
+                  key={date}
+                  aria-label={`${dateLabel(date)}${counts[date] ? `, ${counts[date]} registros` : ""}`}
+                  aria-pressed={date === day}
+                  aria-current={date === today ? "date" : undefined}
+                  className={
+                    (date === day ? "chosen " : "") +
+                    (date === today ? "today" : "")
+                  }
+                  onClick={() => setDay(date)}
+                >
+                  <strong>{i + 1}</strong>
+                  {!!counts[date] && (
+                    <small>
+                      {counts[date]}
+                      <span className="calendar-count-label"> registros</span>
+                    </small>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="calendar-footer">
+            <button
+              onClick={() => {
+                setDay(today);
+                setMonth(today.slice(0, 7));
+              }}
+            >
+              Hoje
+            </button>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={google}
+                disabled={!connected}
+                onChange={(e) => setGoogle(e.target.checked)}
+              />
+              Google Calendar
+            </label>
+            {!connected && (
+              <button className="quiet" onClick={onConnections}>
+                Conectar
+              </button>
+            )}
+          </div>
+          <small className="muted">
+            Marcadores do calendário: registros locais.
+          </small>
+        </section>
+        <section className="panel selected-day">
+          <div className="panel-heading">
+            <h2>{dateLabel(day)}</h2>
+            <button className="quiet" onClick={() => setEditing(null)}>
+              <Plus size={15} />
+              Adicionar
+            </button>
+          </div>
+          {!data ? (
+            <p className="empty">Carregando…</p>
+          ) : (
+            <>
+              {data.errors.map((e) => (
+                <p className="error" key={e}>
+                  {e}
+                </p>
+              ))}
+              {data.events.length + data.tasks.length === 0 && (
+                <p className="empty">Dia livre. Adicione um registro.</p>
+              )}
+              {[...data.events]
+                .sort((a, b) => a.start_at.localeCompare(b.start_at))
+                .map((item) => (
                   <article
-                    className="agenda-event"
-                    key={event.source + event.id}
+                    key={item.source + item.id}
+                    className={
+                      "calendar-item " + (item.completed ? "completed" : "")
+                    }
                   >
                     <span className="badge">
-                      {event.source === "google"
-                        ? "Google Calendar · leitura"
-                        : "Local"}
+                      {item.source === "google"
+                        ? "Google"
+                        : kinds[item.kind || "appointment"]}
                     </span>
-                    <h3>{event.title}</h3>
+                    <h3>{item.title}</h3>
                     <p>
-                      {event.all_day
+                      {item.all_day
                         ? "Dia inteiro"
-                        : formatInstant(event.start_at) +
+                        : formatInstant(item.start_at) +
                           " → " +
-                          formatInstant(event.end_at)}
+                          formatInstant(item.end_at)}
                     </p>
-                    {event.notes && <p>{event.notes}</p>}
-                    <div>
-                      {event.source === "local" ? (
+                    {item.notes && <p>{item.notes}</p>}
+                    {item.reminder_minutes != null && (
+                      <small>
+                        Lembrete:{" "}
+                        {item.reminder_minutes === 0
+                          ? "no horário"
+                          : item.reminder_minutes + " min antes"}
+                        {item.notify_system ? " · Command" : ""}
+                        {item.notify_email ? " · e-mail" : ""}
+                      </small>
+                    )}
+                    {item.email_error && (
+                      <p className="error">{item.email_error}</p>
+                    )}
+                    <div className="calendar-item-actions">
+                      {item.source === "local" ? (
                         <>
                           <button
                             className="quiet"
-                            onClick={() => setEditing(event)}
+                            onClick={() => setEditing(item)}
                           >
-                            Editar compromisso
+                            Editar
                           </button>
+                          {item.kind === "todo" && (
+                            <button
+                              className="quiet"
+                              disabled={busy}
+                              onClick={() =>
+                                run(() =>
+                                  api(
+                                    "/planning/appointments/" + item.id,
+                                    send("PUT", {
+                                      title: item.title,
+                                      notes: item.notes || "",
+                                      start_at: item.start_at,
+                                      end_at: item.end_at,
+                                      context: item.context || "personal",
+                                      kind: item.kind,
+                                      completed: !item.completed,
+                                      reminder_minutes: item.reminder_minutes,
+                                      notify_system: item.notify_system,
+                                      notify_email: item.notify_email,
+                                    }),
+                                  ),
+                                )
+                              }
+                            >
+                              {item.completed ? "Reabrir" : "Concluir"}
+                            </button>
+                          )}
                           <button
                             className="quiet danger"
                             disabled={busy}
                             onClick={async () => {
-                              if (
-                                await confirmAction(
-                                  "Excluir este compromisso local?",
-                                )
-                              )
+                              if (await confirmAction("Excluir este registro?"))
                                 run(() =>
-                                  api("/planning/appointments/" + event.id, {
+                                  api("/planning/appointments/" + item.id, {
                                     method: "DELETE",
                                   }),
                                 );
                             }}
                           >
-                            Excluir compromisso
+                            Excluir
                           </button>
                         </>
                       ) : (
-                        event.link && (
-                          <a href={event.link} target="_blank" rel="noreferrer">
-                            Abrir no Google <ExternalLink size={13} />
+                        item.link && (
+                          <a href={item.link} target="_blank" rel="noreferrer">
+                            Abrir no Google
                           </a>
                         )
                       )}
                     </div>
                   </article>
-                ))
-              ) : (
-                <div className="empty compact">
-                  Nenhum compromisso para este dia.
-                </div>
-              )}
-            </section>
-            <section className="panel agenda-deadlines">
-              <div className="day-panel-heading">
-                <CalendarDays size={20} />
-                <div>
-                  <h2>Tarefas com prazo</h2>
-                  <p>Tarefas não ocupam automaticamente um horário.</p>
-                </div>
-              </div>
-              {data.tasks.map((t) => (
-                <a
-                  className="agenda-task-link"
-                  key={t.id}
-                  href={`/#/tarefa/${t.id}`}
-                >
-                  {t.title}
-                </a>
+                ))}
+              {data.tasks.map((task) => (
+                <article className="calendar-item" key={task.id}>
+                  <span className="badge">Afazer existente</span>
+                  <h3>{task.title}</h3>
+                  <a href={`/#/tarefa/${task.id}`}>Abrir</a>
+                </article>
               ))}
-              {!data.tasks.length && (
-                <div className="empty compact">
-                  Sem tarefas pendentes com prazo neste dia.
-                </div>
+              {data.limited && (
+                <small>Há mais eventos no Google Calendar.</small>
               )}
-            </section>
-          </div>
-          <p className="muted planning-footnote">
-            {data.note}{" "}
-            {data.limited
-              ? "Há mais eventos no Google Calendar; esta consulta foi limitada."
-              : ""}
-          </p>
-        </>
-      ) : (
-        <section className="panel empty">Carregando agenda…</section>
-      )}
+            </>
+          )}
+        </section>
+      </div>
       {editing !== undefined && (
         <div className="modal-backdrop">
           <section
@@ -341,11 +415,11 @@ export default function Agenda({
           >
             <div className="dialog-heading">
               <h2 id="appointment-title">
-                {editing ? "Editar compromisso" : "Novo compromisso"}
+                {editing ? "Editar registro" : "Novo registro"}
               </h2>
               <button
                 className="icon-button"
-                aria-label="Fechar compromisso"
+                aria-label="Fechar registro"
                 onClick={() => setEditing(undefined)}
               >
                 <X size={18} />
@@ -353,7 +427,7 @@ export default function Agenda({
             </div>
             <form onSubmit={save}>
               <label>
-                Título do compromisso
+                Título
                 <input
                   name="title"
                   required
@@ -361,45 +435,44 @@ export default function Agenda({
                   defaultValue={editing?.title}
                 />
               </label>
+              <label>
+                Tipo
+                <select
+                  name="kind"
+                  defaultValue={editing?.kind || "appointment"}
+                >
+                  {Object.entries(kinds).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="form-grid">
                 <label>
                   Início
                   <input
-                    name="start_at"
                     type="datetime-local"
+                    name="start_at"
                     required
                     defaultValue={
-                      editing ? formTime(editing.start_at) : day + "T09:00"
+                      editing ? localTime(editing.start_at) : day + "T09:00"
                     }
                   />
                 </label>
                 <label>
                   Fim
                   <input
-                    name="end_at"
                     type="datetime-local"
+                    name="end_at"
                     required
                     defaultValue={
-                      editing ? formTime(editing.end_at) : day + "T10:00"
+                      editing ? localTime(editing.end_at) : day + "T10:00"
                     }
                   />
                 </label>
               </div>
-              <small>
-                Horários interpretados no fuso da conta:{" "}
-                {getPreferences().timezone}.
-              </small>
-              <label>
-                Contexto do compromisso
-                <select
-                  name="context"
-                  defaultValue={editing?.context || "personal"}
-                >
-                  <option value="personal">Pessoal</option>
-                  <option value="professional">Profissional</option>
-                  <option value="general">Geral</option>
-                </select>
-              </label>
+              <small>{getPreferences().timezone}</small>
               <label>
                 Observações
                 <textarea
@@ -408,13 +481,61 @@ export default function Agenda({
                   defaultValue={editing?.notes}
                 />
               </label>
-              {error && <p className="error">{error}</p>}
+              <label>
+                Lembrete
+                <select
+                  name="reminder_minutes"
+                  defaultValue={editing?.reminder_minutes ?? ""}
+                >
+                  <option value="">Sem lembrete</option>
+                  {[0, 5, 15, 30, 60, 1440, 10080].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 0
+                        ? "No horário"
+                        : n < 60
+                          ? n + " minutos antes"
+                          : n < 1440
+                            ? "1 hora antes"
+                            : n === 1440
+                              ? "1 dia antes"
+                              : "1 semana antes"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="form-grid">
+                <label className="checkbox-label">
+                  <input
+                    name="notify_system"
+                    type="checkbox"
+                    defaultChecked={editing?.notify_system ?? true}
+                  />
+                  No Command
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    name="notify_email"
+                    type="checkbox"
+                    disabled={!emailReady}
+                    defaultChecked={emailReady && editing?.notify_email}
+                  />
+                  Por e-mail
+                </label>
+              </div>
+              {!emailReady && (
+                <small>Ative o envio de e-mail em Fontes e conexões.</small>
+              )}
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditing(undefined)}>
                   Cancelar
                 </button>
                 <button className="primary" disabled={busy}>
-                  Salvar compromisso
+                  Salvar registro
                 </button>
               </div>
             </form>

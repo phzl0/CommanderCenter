@@ -24,7 +24,7 @@ type Notice = {
   read: boolean;
   created_at: string;
   action: UndoAction | null;
-  target?: { kind: string; id?: string };
+  target?: { kind: string; id?: string; day?: string };
 };
 async function undo(action: UndoAction) {
   await api(`/notifications/restore/${action.kind}/${action.id}`, {
@@ -176,7 +176,7 @@ export function NotificationBell() {
     load();
     const interval = window.setInterval(() => {
       if (!document.hidden) load();
-    }, 300000);
+    }, 30000);
     const reload = () => {
       clearTimeout(timer);
       timer = window.setTimeout(load, 200);
@@ -271,15 +271,23 @@ export function NotificationBell() {
                           } else
                             window.dispatchEvent(
                               new CustomEvent("cc-navigate", {
-                                detail: {
-                                  tab: "account",
-                                  section: "connections",
-                                },
+                                detail:
+                                  n.target?.kind === "agenda"
+                                    ? { tab: "agenda", day: n.target.day }
+                                    : {
+                                        tab: "sources",
+                                        section: "connections",
+                                      },
                               }),
                             );
                         }}
                       >
-                        Abrir {n.target.kind === "task" ? "tarefa" : "conexões"}
+                        Abrir{" "}
+                        {n.target.kind === "task"
+                          ? "tarefa"
+                          : n.target.kind === "agenda"
+                            ? "agenda"
+                            : "conexões"}
                       </button>
                       <button
                         className="quiet"

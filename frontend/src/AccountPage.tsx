@@ -257,7 +257,6 @@ export default function AccountPage({
                   }
                 >
                   <option value="dashboard">Visão geral</option>
-                  <option value="daily">Meu dia</option>
                 </select>
               </label>
               <label>

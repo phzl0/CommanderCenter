@@ -112,11 +112,14 @@ export default function WidgetEditor({
     setError("");
     setCities([]);
     try {
-      setCities(
-        await api<City[]>(
-          "/intelligence/city-search?q=" + encodeURIComponent(search),
-        ),
+      const results = await api<City[]>(
+        "/intelligence/city-search?q=" + encodeURIComponent(search),
       );
+      setCities(results);
+      if (!results.length)
+        setError(
+          "Cidade não encontrada. Tente apenas o nome, sem bairro ou CEP, ou use sua localização.",
+        );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -480,6 +483,36 @@ export default function WidgetEditor({
               >
                 {searching ? "Pesquisando…" : "Buscar cidade"}
               </button>
+              <button
+                type="button"
+                disabled={searching}
+                onClick={() => {
+                  if (!navigator.geolocation) {
+                    setError("Localização indisponível neste navegador.");
+                    return;
+                  }
+                  setSearching(true);
+                  navigator.geolocation.getCurrentPosition(
+                    (p) => {
+                      config({
+                        city: "Minha localização",
+                        latitude: p.coords.latitude,
+                        longitude: p.coords.longitude,
+                      });
+                      setSearching(false);
+                    },
+                    () => {
+                      setError(
+                        "Não foi possível obter sua localização. Busque a cidade pelo nome.",
+                      );
+                      setSearching(false);
+                    },
+                    { timeout: 10000, maximumAge: 300000 },
+                  );
+                }}
+              >
+                Usar minha localização
+              </button>
               <div className="search-results">
                 {cities.map((city) => (
                   <button
@@ -505,8 +538,7 @@ export default function WidgetEditor({
                 </div>
               )}
               <small className="muted">
-                Condições e previsão via Open-Meteo. Nenhuma localização do
-                navegador é solicitada.
+                Escolha a cidade nos resultados ou use sua localização.
               </small>
             </section>
           )}

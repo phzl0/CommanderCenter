@@ -60,6 +60,28 @@ export default function WeatherView({
           {weather.wind ?? "—"} km/h
         </span>
       </div>
+      <div className="weather-facts">
+        <span>Umidade {weather.humidity ?? "—"}%</span>
+        <span>Chuva {weather.precipitation ?? "—"} mm</span>
+        <span>
+          Máx. {weather.days[0]?.max ?? "—"}° · Mín.{" "}
+          {weather.days[0]?.min ?? "—"}°
+        </span>
+      </div>
+      {!!weather.hours?.length && (
+        <div className="weather-hours" aria-label="Previsão por hora">
+          {weather.hours.slice(0, detailed ? 24 : 12).map((h) => (
+            <div key={h.time}>
+              <time>{h.time.split("T")[1]?.slice(0, 5)}</time>
+              <WeatherIcon code={h.code} size={18} />
+              <strong>
+                {h.temperature == null ? "—" : Math.round(h.temperature)}°
+              </strong>
+              <small>{h.rain ?? "—"}%</small>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="weather-days">
         {weather.days.slice(0, detailed ? 7 : 4).map((day) => (
           <div key={day.date}>

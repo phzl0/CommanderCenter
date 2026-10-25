@@ -18,15 +18,14 @@ import AccountMenu, { type AccountSection } from "./AccountMenu";
 import { applyPreferences } from "./userPreferences";
 import { api, send, type User } from "./api";
 import { Management } from "./Management";
-import { DataLab } from "./DataLab";
-import { Reports } from "./Reports";
 import { notify } from "./feedback";
 import { NotificationBell } from "./Notifications";
 const AccountPage = lazy(() => import("./AccountPage"));
-const Goals = lazy(() => import("./Goals"));
+const NewsPage = lazy(() => import("./NewsPage"));
+const DataWorkspace = lazy(() => import("./DataWorkspace"));
 const Agenda = lazy(() => import("./Agenda"));
 const MyDay = lazy(() => import("./MyDay"));
-const Sources = lazy(() => import("./Sources"));
+const Sources = lazy(() => import("./SourceWorkspace"));
 const WidgetDetails = lazy(() => import("./WidgetDetails"));
 const Intelligence = lazy(() => import("./Intelligence"));
 type Tab =
@@ -38,16 +37,16 @@ type Tab =
   | "daily"
   | "account"
   | "goals"
-  | "agenda";
+  | "agenda"
+  | "news";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
-  { id: "daily", label: "Meu dia", icon: Sun },
+  { id: "news", label: "Notícias", icon: Rss },
   { id: "agenda", label: "Agenda", icon: CalendarDays },
-  { id: "goals", label: "Metas", icon: Target },
-  { id: "tasks", label: "Tarefas", icon: ListTodo },
-  { id: "imports", label: "Dados e análises", icon: FileSpreadsheet },
-  { id: "reports", label: "Relatórios", icon: Files },
-  { id: "sources", label: "Fontes", icon: Rss },
+
+  { id: "imports", label: "Dados e arquivos", icon: FileSpreadsheet },
+
+  { id: "sources", label: "Fontes e conexões", icon: Rss },
 ] as const;
 export default function App() {
   const [user, setUser] = useState<User | null>(null),
@@ -56,6 +55,7 @@ export default function App() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [menu, setMenu] = useState(false);
+  const [agendaDay, setAgendaDay] = useState<string | undefined>();
   const [taskOpenVersion, setTaskOpenVersion] = useState(0);
   const [accountSection, setAccountSection] =
     useState<AccountSection>("profile");
@@ -106,7 +106,7 @@ export default function App() {
       .then((u) => {
         setUser(u);
         applyPreferences(u.preferences);
-        if (!window.location.hash) setTab(u.preferences.homepage);
+        if (!window.location.hash) setTab("dashboard");
         else if (window.location.hash.startsWith("#/tarefa/")) setTab("tasks");
       })
       .catch(() => {})
@@ -122,9 +122,15 @@ export default function App() {
     const navigate = (e: Event) => {
       const value = (e as CustomEvent).detail;
       if (
-        !["dashboard", "daily", "tasks", "agenda", "goals", "account"].includes(
-          value?.tab,
-        )
+        ![
+          "dashboard",
+          "daily",
+          "tasks",
+          "agenda",
+          "goals",
+          "account",
+          "sources",
+        ].includes(value?.tab)
       )
         return;
       history.replaceState(
@@ -135,7 +141,8 @@ export default function App() {
       setDetailId(null);
       setTaskId(null);
       setMenu(false);
-      setTab(value.tab);
+      if (value.tab === "agenda") setAgendaDay(value.day);
+      setTab(value.section === "connections" ? "sources" : value.tab);
       if (
         ["profile", "preferences", "connections", "security"].includes(
           value.section,
@@ -146,6 +153,10 @@ export default function App() {
     window.addEventListener("cc-navigate", navigate);
     return () => window.removeEventListener("cc-navigate", navigate);
   }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    document.querySelector(".content")?.scrollTo({ top: 0 });
+  }, [tab, detailId]);
   async function login(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -158,7 +169,7 @@ export default function App() {
       );
       setUser(u);
       applyPreferences(u.preferences);
-      setTab(u.preferences.homepage);
+      setTab("dashboard");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -190,7 +201,7 @@ export default function App() {
         <section className="login-story">
           <div className="brand">
             <span>
-              <Command size={24} />
+              <img src="/jester.svg" alt="" width="28" height="28" />
             </span>
             command<span className="brand-light">center</span>
           </div>
@@ -264,6 +275,7 @@ export default function App() {
     setDetailId(null);
     setTaskId(null);
     setTab(t);
+    window.scrollTo({ top: 0 });
     setMenu(false);
     setError("");
   };
@@ -272,7 +284,7 @@ export default function App() {
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <div className="brand">
           <span>
-            <Command size={22} />
+            <img src="/jester.svg" alt="" width="28" height="28" />
           </span>
           command<span className="brand-light">center</span>
         </div>
@@ -337,7 +349,7 @@ export default function App() {
               onLogout={logout}
               onNavigate={(section) => {
                 setAccountSection(section);
-                go("account");
+                go(section === "connections" ? "sources" : "account");
               }}
             />
           </div>
@@ -364,25 +376,30 @@ export default function App() {
               <AccountPage
                 user={user}
                 section={accountSection}
-                onSection={setAccountSection}
+                onSection={(s) => {
+                  setAccountSection(s);
+                  if (s === "connections") go("sources");
+                }}
                 onUser={(u) => {
                   setUser(u);
                   applyPreferences(u.preferences);
                 }}
               />
             </Suspense>
-          ) : tab === "goals" ? (
-            <Suspense fallback={<div className="empty">Carregando metas…</div>}>
-              <Goals />
+          ) : tab === "news" ? (
+            <Suspense
+              fallback={<div className="empty">Carregando notícias…</div>}
+            >
+              <NewsPage />
             </Suspense>
           ) : tab === "agenda" ? (
             <Suspense
               fallback={<div className="empty">Carregando agenda…</div>}
             >
               <Agenda
+                initialDay={agendaDay}
                 onConnections={() => {
-                  setAccountSection("connections");
-                  go("account");
+                  go("sources");
                 }}
               />
             </Suspense>
@@ -396,7 +413,11 @@ export default function App() {
             <Suspense
               fallback={<div className="empty">Carregando fontes…</div>}
             >
-              <Sources />
+              <Sources
+                initialTab={
+                  accountSection === "connections" ? "connections" : "sources"
+                }
+              />
             </Suspense>
           ) : tab === "dashboard" ? (
             <Suspense
@@ -409,21 +430,18 @@ export default function App() {
               <Intelligence user={user} />
             </Suspense>
           ) : tab === "imports" ? (
-            <DataLab />
+            <DataWorkspace />
           ) : tab === "reports" ? (
             <Reports />
           ) : (
             <Management
               key={tab + taskOpenVersion}
-              section={tab}
+              section="tasks"
               initialTaskId={taskId}
             />
           )}
         </main>
-        <footer>
-          Command Center <span>Seu próximo passo começa com clareza.</span>
-          <small>INTELLIGENCE WORKSPACE</small>
-        </footer>
+        <footer>Command Center</footer>
       </div>
     </div>
   );
