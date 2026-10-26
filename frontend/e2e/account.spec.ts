@@ -148,7 +148,7 @@ test("private profile preferences and security", async ({ page }) => {
     .route("https://github.com/login/oauth/authorize?*", async (route) => {
       const state = new URL(route.request().url()).searchParams.get("state");
       await route.fulfill({
-        contentType: "text/html",
+        contentType: "text/html; charset=utf-8",
         body: `<a href="http://localhost:5173/api/integrations/github/callback?error=access_denied&state=${state}">Cancelar autorização de teste</a>`,
       });
     });
@@ -177,7 +177,7 @@ test("private profile preferences and security", async ({ page }) => {
     .route("https://github.com/login/oauth/authorize?*", async (route) => {
       connected = true;
       await route.fulfill({
-        contentType: "text/html",
+        contentType: "text/html; charset=utf-8",
         body: '<script>window.opener.postMessage({type:"cc-oauth-result",provider:"github",outcome:"connected"},"http://localhost:5173");window.close();</script>',
       });
     });
