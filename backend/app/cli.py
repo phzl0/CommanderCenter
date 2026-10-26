@@ -2,7 +2,7 @@
 
 import argparse
 import getpass
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from app.core.db import SessionLocal
 from app.core.security import passwords
 from app.models import User, SessionToken
@@ -11,7 +11,14 @@ from app.models import User, SessionToken
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "action", choices=["create-user", "reset-password", "disable-user"]
+        "action",
+        choices=[
+            "create-user",
+            "reset-password",
+            "disable-user",
+            "grant-admin",
+            "revoke-admin",
+        ],
     )
     parser.add_argument("--email", required=True)
     parser.add_argument("--name")
@@ -28,7 +35,9 @@ def main():
                 parser.error("Informe --name com até 100 caracteres.")
         elif not user:
             parser.error("Usuário não encontrado.")
-        if args.action == "disable-user":
+        if args.action in ("grant-admin", "revoke-admin"):
+            user.is_admin = args.action == "grant-admin"
+        elif args.action == "disable-user":
             user.active = False
         else:
             password = getpass.getpass("Senha (12 a 128 caracteres): ")
@@ -40,6 +49,7 @@ def main():
                     name=args.name.strip(),
                     email=email,
                     password_hash=passwords.hash(password),
+                    is_admin=db.scalar(select(func.count()).select_from(User)) == 0,
                 )
                 db.add(user)
             else:

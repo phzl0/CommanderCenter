@@ -12,8 +12,11 @@ from typing import Literal
 from urllib.parse import urlencode, urlparse, quote
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from pydantic import Field
+from app.modules.management import StrictModel
+from app.core.security import passwords, limiter
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -21,6 +24,7 @@ from app.core.db import get_db
 from app.core.security import current_user, COOKIE, token_hash
 from app.models import (
     User,
+    OAuthApplication,
     IntegrationConnection,
     IntegrationFlow,
     DashboardWidget,
@@ -64,35 +68,48 @@ def unpack(data):
         )
 
 
-def specification(provider):
+def application(db, provider, lock=False):
+    query = (
+        select(OAuthApplication)
+        .where(OAuthApplication.provider == provider)
+        .execution_options(populate_existing=True)
+    )
+    if lock:
+        query = query.with_for_update()
+    return db.scalar(query)
+
+
+def specification(provider, db=None):
+    saved = application(db, provider) if db is not None else None
+    values = unpack(saved.credentials) if saved and saved.credentials else {}
+    client_id = values.get("client_id", getattr(settings, provider + "_client_id"))
+    client_secret = values.get(
+        "client_secret", getattr(settings, provider + "_client_secret")
+    )
+    tenant = values.get("tenant", settings.microsoft_tenant)
+
     if provider == "github":
         return {
-            "id": settings.github_client_id,
-            "secret": settings.github_client_secret,
+            "id": client_id,
+            "secret": client_secret,
             "authorize": "https://github.com/login/oauth/authorize",
             "token": "https://github.com/login/oauth/access_token",
             "scope": "read:user",
         }
     if provider == "google":
         return {
-            "id": settings.google_client_id,
-            "secret": settings.google_client_secret,
+            "id": client_id,
+            "secret": client_secret,
             "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
             "token": "https://oauth2.googleapis.com/token",
             "scope": "openid email profile https://www.googleapis.com/auth/calendar.readonly",
         }
-    if not re.fullmatch(
-        r"organizations|common|[A-Za-z0-9.-]{1,100}", settings.microsoft_tenant
-    ):
+    if not re.fullmatch(r"organizations|common|[A-Za-z0-9.-]{1,100}", tenant):
         raise HTTPException(503, "MICROSOFT_TENANT inválido na configuração local.")
-    base = (
-        "https://login.microsoftonline.com/"
-        + settings.microsoft_tenant
-        + "/oauth2/v2.0/"
-    )
+    base = "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/"
     return {
-        "id": settings.microsoft_client_id,
-        "secret": settings.microsoft_client_secret,
+        "id": client_id,
+        "secret": client_secret,
         "authorize": base + "authorize",
         "token": base + "token",
         "scope": "offline_access User.Read Tasks.Read",
@@ -118,8 +135,8 @@ def callback_url(provider):
     return origin + f"/api/integrations/{provider}/callback"
 
 
-def configured(provider):
-    s = specification(provider)
+def configured(provider, db=None):
+    s = specification(provider, db)
     return bool(s["id"] and s["secret"])
 
 
@@ -200,7 +217,7 @@ def credentials(db, user, provider):
     if row.expires_at and row.expires_at < now() + timedelta(seconds=60):
         if not data.get("refresh_token"):
             raise providers.ProviderError("A autorização expirou. Reconecte a conta.")
-        spec = specification(provider)
+        spec = specification(provider, db)
         fresh = remote(
             "POST",
             spec["token"],
@@ -239,7 +256,8 @@ def invalidate(db, user, provider):
 def status(db: Session = Depends(get_db), user: User = Depends(current_user)):
     return {
         p: {
-            "configured": configured(p),
+            "configured": configured(p, db),
+            "can_configure": user.is_admin,
             "connected": bool(r := connection(db, user, p)),
             "account": r.account if r else None,
             "checked_at": r.checked_at if r else None,
@@ -255,14 +273,98 @@ def status(db: Session = Depends(get_db), user: User = Depends(current_user)):
     }
 
 
-@router.post("/{provider}/start")
-def start(
+def require_admin(user):
+    if not user.is_admin:
+        raise HTTPException(
+            403, "Somente o administrador pode configurar os aplicativos."
+        )
+
+
+class ApplicationInput(StrictModel):
+    client_id: str = Field(min_length=1, max_length=300)
+    client_secret: str = Field(default="", max_length=2000)
+    tenant: str = Field(
+        default="organizations",
+        pattern=r"^(organizations|common|[A-Za-z0-9.-]{1,100})$",
+    )
+    password: str = Field(min_length=1, max_length=128)
+    disconnect_accounts: bool = False
+
+
+@router.get("/admin/applications")
+def application_status(
+    db: Session = Depends(get_db), user: User = Depends(current_user)
+):
+    require_admin(user)
+    result = {}
+    for provider in ("github", "google", "microsoft"):
+        spec = specification(provider, db)
+        row = application(db, provider)
+        result[provider] = {
+            "client_id": spec["id"],
+            "has_secret": bool(spec["secret"]),
+            "source": "system" if row and row.credentials else "environment",
+            "callback_url": callback_url(provider),
+            "tenant": unpack(row.credentials).get("tenant", "organizations")
+            if row and row.credentials
+            else settings.microsoft_tenant,
+        }
+    return result
+
+
+@router.put("/admin/applications/{provider}")
+def save_application(
     provider: Provider,
+    data: ApplicationInput,
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    spec = specification(provider)
+    require_admin(user)
+    limiter.check("oauth-config:" + user.id)
+    if not passwords.verify(data.password, user.password_hash):
+        raise HTTPException(403, "Senha atual incorreta.")
+    row = application(db, provider, lock=True)
+    current = specification(provider, db)
+    secret = data.client_secret or (
+        current["secret"] if data.client_id == current["id"] else ""
+    )
+    if not secret:
+        raise HTTPException(422, "Informe o Client Secret deste aplicativo.")
+    connections = list(
+        db.scalars(
+            select(IntegrationConnection).where(
+                IntegrationConnection.provider == provider
+            )
+        )
+    )
+    if connections and not data.disconnect_accounts:
+        raise HTTPException(
+            409,
+            "A troca do aplicativo exige reconectar as contas. Marque a confirmação para continuar.",
+        )
+    row.credentials = pack(
+        {"client_id": data.client_id, "client_secret": secret, "tenant": data.tenant}
+    )
+    db.execute(delete(IntegrationFlow).where(IntegrationFlow.provider == provider))
+    for connection_row in connections:
+        owner = db.get(User, connection_row.owner_id)
+        invalidate(db, owner, provider)
+        db.delete(connection_row)
+    db.commit()
+    return {"ok": True, "reconnect_required": bool(connections)}
+
+
+@router.post("/{provider}/start")
+def start(
+    provider: Provider,
+    request: Request,
+    popup: bool = Query(False),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    application(db, provider, lock=True)
+    spec = specification(provider, db)
     redirect = callback_url(provider)
     if request.headers.get("origin") != settings.integration_origin.rstrip("/"):
         raise HTTPException(
@@ -271,10 +373,10 @@ def start(
             + settings.integration_origin.rstrip("/")
             + " e entre novamente.",
         )
-    if not configured(provider):
+    if not configured(provider, db):
         raise HTTPException(
             409,
-            "Configure o aplicativo de conexão no .env local. Consulte docs/connections.md no repositório.",
+            "O administrador precisa configurar este aplicativo em Fontes e conexões.",
         )
     db.scalar(select(User).where(User.id == user.id).with_for_update())
     db.execute(
@@ -295,6 +397,7 @@ def start(
     )
     db.add(
         IntegrationFlow(
+            popup=popup,
             state_hash=token_hash(state),
             owner_id=user.id,
             session_hash=token_hash(request.cookies.get(COOKIE, "")),
@@ -334,6 +437,7 @@ def callback(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    application(db, provider, lock=True)
     flow = db.scalar(
         select(IntegrationFlow)
         .where(IntegrationFlow.state_hash == token_hash(state))
@@ -349,13 +453,14 @@ def callback(
         raise HTTPException(
             400, "Autorização inválida ou expirada. Inicie a conexão novamente."
         )
+    popup = flow.popup
     verifier = unpack(flow.verifier)
     db.delete(flow)
-    db.commit()
+    db.flush()
     outcome = "cancelled" if error or not code else "connected"
     if outcome == "connected":
         try:
-            spec = specification(provider)
+            spec = specification(provider, db)
             data = remote(
                 "POST",
                 spec["token"],
@@ -406,7 +511,29 @@ def callback(
             db.commit()
         except (providers.ProviderError, KeyError, ValueError):
             db.rollback()
+            db.execute(
+                delete(IntegrationFlow).where(
+                    IntegrationFlow.state_hash == token_hash(state),
+                    IntegrationFlow.owner_id == user.id,
+                )
+            )
             outcome = "failed"
+    db.commit()
+    if popup:
+        origin = settings.integration_origin.rstrip("/")
+        payload = json.dumps(
+            {"type": "cc-oauth-result", "provider": provider, "outcome": outcome}
+        )
+        nonce = secrets.token_urlsafe(20)
+        from html import escape
+
+        body = f"""<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Conexão · Command Center</title><body><h1>{"Conta conectada" if outcome == "connected" else "Conexão não concluída"}</h1><p>Você pode fechar esta aba e voltar ao Command Center.</p><a href="{escape(origin, quote=True)}/#/connection/{outcome}">Voltar ao Command Center</a><script nonce="{nonce}">if(window.opener){{window.opener.postMessage({payload},{json.dumps(origin)});window.close();}}</script></body></html>"""
+        return HTMLResponse(
+            body,
+            headers={
+                "Content-Security-Policy": f"default-src 'none'; script-src 'nonce-{nonce}'; base-uri 'none'; frame-ancestors 'none'"
+            },
+        )
     return RedirectResponse(
         settings.integration_origin.rstrip("/") + "/#/connection/" + outcome,
         status_code=303,

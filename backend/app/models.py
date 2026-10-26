@@ -34,6 +34,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
@@ -254,7 +257,16 @@ class IntegrationConnection(Owned, Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class OAuthApplication(Base):
+    __tablename__ = "oauth_applications"
+    provider: Mapped[str] = mapped_column(String(20), primary_key=True)
+    credentials: Mapped[str | None] = mapped_column(Text)
+
+
 class IntegrationFlow(Base):
+    popup: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     __tablename__ = "integration_flows"
     state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)

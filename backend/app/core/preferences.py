@@ -26,6 +26,7 @@ def account_view(db, user):
     row = db.get(AccountSettings, user.id)
     return {
         "id": user.id,
+        "is_admin": user.is_admin,
         "name": user.name,
         "email": user.email,
         "created_at": user.created_at,
