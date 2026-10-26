@@ -102,7 +102,8 @@ export async function api<T>(
     path.startsWith("/notifications") ||
     path.endsWith("/bootstrap") ||
     path === "/sources/preview" ||
-    path === "/sources/articles/state";
+    path === "/sources/articles/state" ||
+    /^\/integrations\/(github|google|microsoft)\/start(?:\?|$)/.test(path);
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !silent) {
     let title =
       method === "DELETE"
@@ -110,6 +111,13 @@ export async function api<T>(
         : method === "POST"
           ? "Registro adicionado"
           : "Alterações salvas";
+    if (path.startsWith("/integrations/admin/applications/"))
+      title = "Aplicativo configurado";
+    if (
+      method === "DELETE" &&
+      /^\/integrations\/(github|google|microsoft)$/.test(path)
+    )
+      title = "Conta desconectada";
     if (path === "/account/profile") title = "Perfil atualizado";
     if (path === "/account/preferences") title = "Preferências salvas";
     if (path === "/account/password") title = "Senha atualizada";

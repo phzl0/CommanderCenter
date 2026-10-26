@@ -127,6 +127,7 @@ export default function ApplicationSettings() {
             Serviço
             <select
               aria-label="Serviço de conexão"
+              disabled={busy}
               value={provider}
               onChange={(e) => choose(e.target.value as Provider)}
             >
