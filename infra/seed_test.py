@@ -18,6 +18,7 @@ with SessionLocal() as db:
     db.add(
         User(
             name="Conta de teste",
+            is_admin=True,
             email="account@example.test",
             password_hash=passwords.hash("disposable-account-password"),
         )

@@ -1,3 +1,7 @@
+# Conexões pela interface
+
+Agora é possível configurar Client ID e Secret no sistema e autorizar em janela separada. Consulte [o novo guia](conexoes-pelo-sistema.md). As instruções de `.env` abaixo continuam como alternativa.
+
 # Conexões de contas (0.4)
 
 O Command Center executa localmente. As conexões abaixo pertencem ao aplicativo; elas são independentes dos conectores do ChatGPT. Não envie chaves pelo chat nem as coloque no Git.

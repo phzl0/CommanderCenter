@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "./api";
 import { formatInstant } from "./userPreferences";
 import { confirmAction, dataChanged } from "./feedback";
 type State = {
   configured: boolean;
+  can_configure?: boolean;
   connected: boolean;
   account: string | null;
   callback_url?: string;
@@ -35,26 +36,108 @@ export default function AccountConnection({
     [lists, setLists] = useState<{ id: string; name: string }[]>([]),
     [search, setSearch] = useState(""),
     [help, setHelp] = useState(false);
+  const cleanup = useRef<() => void>(() => {});
+  const popupRef = useRef<Window | null>(null);
   useEffect(() => {
     let live = true;
-    api<Record<string, State>>("/integrations")
-      .then((r) => live && setState(r[provider]))
-      .catch((e) => live && setError(e.message));
+    const refresh = () =>
+      api<Record<string, State>>("/integrations")
+        .then((r) => {
+          if (live) setState(r[provider]);
+        })
+        .catch((e) => live && setError(e.message));
+    refresh();
+    window.addEventListener("cc-connections-changed", refresh);
+    window.addEventListener("focus", refresh);
     return () => {
       live = false;
+      cleanup.current();
+      window.removeEventListener("cc-connections-changed", refresh);
+      window.removeEventListener("focus", refresh);
     };
   }, [provider]);
   async function connect() {
+    cleanup.current();
+    const popup = window.open(
+      "about:blank",
+      "cc-oauth-" + provider,
+      "popup,width=620,height=760",
+    );
+    popupRef.current = popup;
     setBusy(true);
     setError("");
     try {
-      const r = await api<{ url: string }>(`/integrations/${provider}/start`, {
-        method: "POST",
-      });
-      window.location.assign(r.url);
+      const r = await api<{ url: string }>(
+        `/integrations/${provider}/start?popup=${!!popup}`,
+        { method: "POST" },
+      );
+      if (!popup) {
+        window.location.assign(r.url);
+        return;
+      }
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        cleanup.current();
+        popupRef.current = null;
+        setBusy(false);
+        window.dispatchEvent(new Event("cc-connections-changed"));
+        dataChanged();
+      };
+      const message = (e: MessageEvent) => {
+        if (
+          e.origin !== window.location.origin ||
+          e.source !== popup ||
+          e.data?.type !== "cc-oauth-result" ||
+          e.data.provider !== provider
+        )
+          return;
+        if (e.data.outcome !== "connected")
+          setError(
+            e.data.outcome === "cancelled"
+              ? "Autorização cancelada."
+              : "Não foi possível conectar. Confira o aplicativo e tente novamente.",
+          );
+        finish();
+      };
+      window.addEventListener("message", message);
+      let polling = false;
+      const poll = window.setInterval(async () => {
+        if (polling) return;
+        if (popup.closed) {
+          finish();
+          return;
+        }
+        polling = true;
+        try {
+          const status = await api<Record<string, State>>("/integrations");
+          if (!done) setState(status[provider]);
+        } catch {
+        } finally {
+          polling = false;
+        }
+      }, 2000);
+      const timeout = window.setTimeout(
+        () => {
+          setError("A autorização expirou. Tente conectar novamente.");
+          finish();
+        },
+        10 * 60 * 1000,
+      );
+      cleanup.current = () => {
+        done = true;
+        window.clearInterval(poll);
+        window.clearTimeout(timeout);
+        window.removeEventListener("message", message);
+      };
+      popup.location.href = r.url;
     } catch (e) {
-      setError((e as Error).message);
+      cleanup.current();
+      popupRef.current = null;
+      popup?.close();
       setBusy(false);
+      setError((e as Error).message);
     }
   }
   async function disconnect() {
@@ -105,37 +188,6 @@ export default function AccountConnection({
           ? `Conectado: ${state.account}`
           : "Conecte sua conta para escolher o que acompanhar."}
       </p>
-      {state?.callback_url && (
-        <div className="connection-help">
-          <small>
-            Cadastre esta URL de retorno no aplicativo{" "}
-            {provider === "github"
-              ? "do GitHub (Authorization callback URL)"
-              : provider === "microsoft"
-                ? "da Microsoft (Redirect URI)"
-                : "do Google (Authorized redirect URI)"}
-            :
-          </small>
-          <input
-            aria-label="URL de retorno da conexão"
-            value={state.callback_url}
-            readOnly
-            onFocus={(e) => e.target.select()}
-          />
-          <small>
-            O Client ID e o Secret devem pertencer ao mesmo aplicativo.
-          </small>
-          {new URL(state.callback_url).origin !== window.location.origin && (
-            <p>
-              Para autorizar com a mesma sessão,{" "}
-              <a href={new URL(state.callback_url).origin}>
-                abra o endereço configurado
-              </a>{" "}
-              e entre novamente.
-            </p>
-          )}
-        </div>
-      )}
       <small>
         {state?.checked_at
           ? "Última consulta: " + formatInstant(state.checked_at)
@@ -167,6 +219,9 @@ export default function AccountConnection({
                   ? "Listar listas do To Do"
                   : "Ver agenda"}
             </button>
+            <button type="button" disabled={busy} onClick={connect}>
+              Reconectar
+            </button>
             <button
               type="button"
               className="quiet"
@@ -187,29 +242,14 @@ export default function AccountConnection({
         )}
       </div>
       {help && (
-        <div className="connection-help">
-          <p>
-            Ative a conexão configurando{" "}
-            {provider === "github"
-              ? "GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET"
-              : provider === "microsoft"
-                ? "MICROSOFT_CLIENT_ID e MICROSOFT_CLIENT_SECRET"
-                : "GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET"}{" "}
-            no .env do servidor. Veja o guia{" "}
-            <a
-              href="https://github.com/phzl0/CommanderCenter/blob/main/docs/connections.md"
-              target="_blank"
-              rel="noreferrer"
-            >
-              de conexão de contas
-            </a>
-            .
-          </p>
-          <small>
-            Sem essa configuração, você ainda pode usar os outros cards
-            normalmente.
-          </small>
-        </div>
+        <p className="connection-help">
+          {state?.can_configure
+            ? "Abra Fontes e conexões → Conexões → Configurar aplicativos para cadastrar o Client ID e o Client Secret."
+            : "O administrador precisa habilitar este serviço. Depois, você poderá conectar sua conta aqui."}
+        </p>
+      )}
+      {busy && popupRef.current && (
+        <p className="muted">Conclua a autorização na janela do serviço.</p>
       )}
       {provider === "github" && repos.length > 0 && (
         <>
@@ -235,49 +275,6 @@ export default function AccountConnection({
                 </button>
               ))}
           </div>
-          {state?.callback_url && (
-            <div className="connection-help">
-              <small>
-                Cadastre esta URL de retorno no aplicativo{" "}
-                {provider === "github"
-                  ? "do GitHub (Authorization callback URL)"
-                  : provider === "microsoft"
-                    ? "da Microsoft (Redirect URI)"
-                    : "do Google (Authorized redirect URI)"}
-                :
-              </small>
-              <input
-                aria-label="URL de retorno da conexão"
-                value={state.callback_url}
-                readOnly
-                onFocus={(e) => e.target.select()}
-              />
-              <small>
-                O Client ID e o Secret devem pertencer ao mesmo aplicativo.
-              </small>
-              {new URL(state.callback_url).origin !==
-                window.location.origin && (
-                <p>
-                  Para autorizar com a mesma sessão,{" "}
-                  <a href={new URL(state.callback_url).origin}>
-                    abra o endereço configurado
-                  </a>{" "}
-                  e entre novamente.
-                </p>
-              )}
-            </div>
-          )}
-          <small>
-            {state?.checked_at
-              ? "Última consulta: " + formatInstant(state.checked_at)
-              : "Nenhuma consulta registrada"}
-          </small>
-          {state?.permissions && (
-            <small>
-              Permissões solicitadas: {state.permissions.join(" · ")}
-            </small>
-          )}
-          {state?.last_error && <p className="error">{state.last_error}</p>}
           <div className="connection-actions">
             <button
               type="button"

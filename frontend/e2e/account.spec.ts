@@ -119,10 +119,79 @@ test("private profile preferences and security", async ({ page }) => {
   await page
     .getByRole("button", { name: "Conectar Google Calendar", exact: true })
     .click();
-  await expect(page.locator(".connections-grid")).toContainText(
-    "GOOGLE_CLIENT_ID",
-  );
+  await expect(page.locator(".connections-grid")).toContainText("Client ID");
   await capture("connections-desktop");
+  await page
+    .getByRole("button", { name: "Configurar aplicativos", exact: true })
+    .click();
+  await page.getByLabel("Client ID", { exact: true }).fill("ci-github-client");
+  await page
+    .getByLabel("Client Secret", { exact: true })
+    .fill("disposable-ci-app-secret");
+  await page
+    .getByLabel("Senha para configurar aplicativos", { exact: true })
+    .fill("disposable-account-password");
+  await page
+    .getByRole("button", { name: "Salvar aplicativo", exact: true })
+    .click();
+  await expect(page.getByLabel("Client Secret", { exact: true })).toHaveValue(
+    "",
+  );
+  const config = await page.request.get("/api/integrations/admin/applications");
+  expect(await config.text()).not.toContain("disposable-ci-app-secret");
+  await page
+    .getByRole("button", { name: "Fechar configuração", exact: true })
+    .click();
+  // Mock the provider page, never authorize a real external account in CI.
+  await page
+    .context()
+    .route("https://github.com/login/oauth/authorize?*", async (route) => {
+      const state = new URL(route.request().url()).searchParams.get("state");
+      await route.fulfill({
+        contentType: "text/html",
+        body: `<a href="http://localhost:5173/api/integrations/github/callback?error=access_denied&state=${state}">Cancelar autorização de teste</a>`,
+      });
+    });
+  let opened = page.waitForEvent("popup");
+  await page
+    .getByRole("button", { name: "Conectar GitHub", exact: true })
+    .click();
+  const auth = await opened;
+  await auth
+    .getByRole("link", { name: "Cancelar autorização de teste" })
+    .click();
+  await expect(
+    page.getByText("Autorização cancelada.", { exact: true }),
+  ).toBeVisible();
+  let connected = false;
+  await page.route("**/api/integrations", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    if (connected)
+      body.github = { ...body.github, connected: true, account: "Conta CI" };
+    await route.fulfill({ response, json: body });
+  });
+  await page.context().unroute("https://github.com/login/oauth/authorize?*");
+  await page
+    .context()
+    .route("https://github.com/login/oauth/authorize?*", async (route) => {
+      connected = true;
+      await route.fulfill({
+        contentType: "text/html",
+        body: '<script>window.opener.postMessage({type:"cc-oauth-result",provider:"github",outcome:"connected"},"http://localhost:5173");window.close();</script>',
+      });
+    });
+  opened = page.waitForEvent("popup");
+  await page
+    .getByRole("button", { name: "Conectar GitHub", exact: true })
+    .click();
+  await opened;
+  await expect(
+    page.getByText("Conectado: Conta CI", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reconectar", exact: true }),
+  ).toBeVisible();
   await menu("Segurança");
   await page
     .getByLabel("Senha atual", { exact: true })

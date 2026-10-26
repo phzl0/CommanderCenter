@@ -805,3 +805,25 @@ footer {
 .compact-grid .card-detail-actions {
   gap: 12px;
 }
+
+.application-settings {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.application-settings h2 {
+  font-size: 16px;
+}
+.application-settings form {
+  max-width: 680px;
+}
+.application-settings p,
+.setup-steps {
+  font-size: 12px;
+}
+.setup-steps {
+  padding-left: 20px;
+  line-height: 1.8;
+}
+.application-settings input[readonly] {
+  font-size: 12px;
+}

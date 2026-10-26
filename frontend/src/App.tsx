@@ -55,6 +55,9 @@ export default function App() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [menu, setMenu] = useState(false);
+  const [connectionReturn] = useState(() =>
+    /^#\/connection\/(connected|failed|cancelled)$/.test(window.location.hash),
+  );
   const [agendaDay, setAgendaDay] = useState<string | undefined>();
   const [taskOpenVersion, setTaskOpenVersion] = useState(0);
   const [accountSection, setAccountSection] =
@@ -106,7 +109,10 @@ export default function App() {
       .then((u) => {
         setUser(u);
         applyPreferences(u.preferences);
-        if (!window.location.hash) setTab("dashboard");
+        if (connectionReturn) {
+          setTab("sources");
+          setAccountSection("connections");
+        } else if (!window.location.hash) setTab("dashboard");
         else if (window.location.hash.startsWith("#/tarefa/")) setTab("tasks");
       })
       .catch(() => {})

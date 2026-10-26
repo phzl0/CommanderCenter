@@ -1,6 +1,7 @@
 import { formatInstant } from "./userPreferences";
 import { notify, type UndoAction } from "./feedback";
 export type User = {
+  is_admin: boolean;
   id: string;
   name: string;
   email: string;
