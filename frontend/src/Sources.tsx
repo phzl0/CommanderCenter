@@ -17,6 +17,8 @@ import { api, send } from "./api";
 import { confirmAction, dataChanged } from "./feedback";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
 export type Source = {
+  is_primary?: boolean;
+  is_selected?: boolean;
   builtin_key?: string | null;
   id: string;
   name: string;
@@ -35,7 +37,7 @@ type Preview = {
 };
 export default function Sources() {
   const [wizard, setWizard] = useState(false);
-  const [category, setCategory] = useState("Política");
+  const [category, setCategory] = useState("");
   const [sources, setSources] = useState<Source[]>([]),
     [mode] = useState("sources"),
     [emailReady, setEmailReady] = useState(false),
@@ -156,6 +158,10 @@ export default function Sources() {
           Adicionar fonte · avançado
         </button>
       </div>
+      <p className="muted">
+        9 fontes padrão: 3 por categoria. Escolha a principal ou uma alternativa
+        na aba Notícias.
+      </p>
       <div className="sources-toolbar">
         <select
           aria-label="Categoria das fontes"
@@ -241,7 +247,7 @@ export default function Sources() {
                 </div>
                 {s.builtin_key ? (
                   <small className="source-fixed">
-                    Fonte padrão · pronta para uso
+                    {s.is_primary ? "Principal" : "Alternativa"} · {s.category}
                   </small>
                 ) : (
                   <div className="source-actions">

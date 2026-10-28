@@ -232,6 +232,7 @@ export default function Economy() {
             onChange={(e) => setDays(Number(e.target.value))}
           >
             {[
+              [1, "24 horas"],
               [7, "7 dias"],
               [30, "1 mês"],
               [90, "3 meses"],
@@ -286,6 +287,11 @@ export default function Economy() {
                   {indicator?.data_date && "Referência: " + indicator.data_date}
                 </span>
               </div>
+              {indicator?.as_of && (
+                <small className="economic-note">
+                  Consulta válida: {formatInstant(indicator.as_of)}
+                </small>
+              )}
               {indicator?.period_note && (
                 <small className="economic-note">{indicator.period_note}</small>
               )}

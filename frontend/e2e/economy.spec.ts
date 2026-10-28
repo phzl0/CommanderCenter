@@ -124,6 +124,30 @@ test("economy map periods, guided source and informative agenda", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Fechar ação", exact: true }).click();
   await nav.getByRole("button", { name: "Notícias", exact: true }).click();
+  const sourceSelect = page.getByLabel("Fonte de notícias", { exact: true });
+  await expect(sourceSelect.locator("option")).toHaveCount(3);
+  await expect(sourceSelect).toContainText("Principal");
+  await page.getByRole("button", { name: "Futebol", exact: true }).click();
+  await expect(sourceSelect.locator("option")).toHaveCount(3);
+  const alternative = await sourceSelect
+    .locator("option")
+    .filter({ hasText: "UOL" })
+    .getAttribute("value");
+  await sourceSelect.selectOption(alternative!);
+  await expect(sourceSelect).toBeEnabled();
+  const savedSources = await (
+    await page.request.post("/api/sources/bootstrap", {
+      headers: { Origin: "http://localhost:5173" },
+    })
+  ).json();
+  expect(
+    savedSources.find((s: { id: string }) => s.id === alternative).is_selected,
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "test-results/news-source-choices.png",
+    fullPage: true,
+  });
+
   await page.route("**/api/sources/preview", (route) =>
     route.fulfill({
       json: {
@@ -227,5 +251,12 @@ test("economy map periods, guided source and informative agenda", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
+
+  // Exercise the real HTTP API: UI mocks alone missed numeric query validation.
+  for (const query of ["days=7&interval=month", "days=1&interval=hour"]) {
+    const response = await page.request.get("/api/economy/overview?" + query);
+    expect(response.status(), await response.text()).toBe(200);
+    expect((await response.json()).indicators).toHaveProperty("usd");
+  }
   expect(errors).toEqual([]);
 });

@@ -273,7 +273,7 @@ test("compact command center: five cards, news, calendar, files and exports", as
   await nav
     .getByRole("button", { name: "Fontes e conexões", exact: true })
     .click();
-  await expect(page.locator(".source-card")).toHaveCount(3);
+  await expect(page.locator(".source-card")).toHaveCount(9);
   await expect(
     page.getByRole("button", { name: "Ler depois", exact: true }),
   ).toHaveCount(0);

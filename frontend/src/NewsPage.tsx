@@ -1,48 +1,63 @@
 import { useEffect, useState } from "react";
 import SourceWizard from "./SourceWizard";
 import { RefreshCw } from "lucide-react";
-import { api } from "./api";
+import { api, send } from "./api";
+import { formatInstant } from "./userPreferences";
 import NewsCarousel from "./NewsCarousel";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
 import type { Source } from "./Sources";
+type NewsResult = {
+  items: NewsItem[];
+  selected_source?: Source | null;
+  available_sources?: Source[];
+  source_errors?: { source: string; message: string }[];
+};
 export default function NewsPage() {
-  const [items, setItems] = useState<NewsItem[]>([]),
-    [categories, setCategories] = useState<string[]>([]),
-    [category, setCategory] = useState("Política"),
+  const [category, setCategory] = useState("Política"),
+    [choice, setChoice] = useState(""),
     [wizard, setWizard] = useState(false),
     [sources, setSources] = useState<Source[]>([]),
     [version, setVersion] = useState(0),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [saving, setSaving] = useState(false),
+    [error, setError] = useState(""),
+    [result, setResult] = useState<{ key: string; data: NewsResult } | null>(
+      null,
+    ),
+    [page, setPage] = useState(1);
+  const requestKey = category + ":" + choice;
+  const data = result?.key === requestKey ? result.data : null;
+  const items = data?.items || [];
+  const group = sources.filter((s) => s.enabled && s.category === category);
+  const categories = [
+    ...new Set(sources.filter((s) => s.enabled).map((s) => s.category)),
+  ];
+  const selectedId =
+    choice ||
+    data?.selected_source?.id ||
+    group.find((s) => s.is_selected)?.id ||
+    group.find((s) => s.is_primary)?.id ||
+    group[0]?.id ||
+    "";
   useEffect(() => {
     let live = true;
     api<Source[]>("/sources/bootstrap", { method: "POST" })
-      .then((r) => {
-        if (live) {
-          setSources(r);
-          setCategories([
-            ...new Set(r.filter((s) => s.enabled).map((s) => s.category)),
-          ]);
-        }
-      })
+      .then((r) => live && setSources(r))
       .catch((e) => live && setError(e.message));
     return () => {
       live = false;
     };
-  }, []);
+  }, [version]);
   useEffect(() => {
     let live = true;
     setBusy(true);
     setError("");
-    api<{
-      items: NewsItem[];
-      source_errors?: { source: string; message: string }[];
-    }>(
-      `/intelligence/news?category=${encodeURIComponent(category)}&refresh=${version > 0}`,
+    api<NewsResult>(
+      `/intelligence/news?category=${encodeURIComponent(category)}&source_id=${encodeURIComponent(choice)}&refresh=${version > 0}`,
     )
       .then((r) => {
         if (live) {
-          setItems(r.items);
+          setResult({ key: requestKey, data: r });
           if (r.source_errors?.length)
             setError(
               r.source_errors
@@ -56,8 +71,28 @@ export default function NewsPage() {
     return () => {
       live = false;
     };
-  }, [category, version]);
-  const [page, setPage] = useState(1);
+  }, [category, choice, version]);
+  function changeCategory(value: string) {
+    setCategory(value);
+    setChoice("");
+    setPage(1);
+  }
+  async function choose(value: string) {
+    setSaving(true);
+    setError("");
+    try {
+      await api(
+        "/sources/preference",
+        send("PUT", { category, source_id: value }),
+      );
+      setChoice(value);
+      setPage(1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
   const headlines = items.slice(5),
     pages = Math.max(1, Math.ceil(headlines.length / 8));
   return (
@@ -73,11 +108,9 @@ export default function NewsPage() {
             {["Política", "Futebol", "Economia"].map((c) => (
               <button
                 key={c}
+                disabled={saving}
                 className={category === c ? "active" : ""}
-                onClick={() => {
-                  setCategory(c);
-                  setPage(1);
-                }}
+                onClick={() => changeCategory(c)}
               >
                 {c}
               </button>
@@ -88,17 +121,13 @@ export default function NewsPage() {
           ) && (
             <select
               aria-label="Outras categorias"
+              disabled={saving}
               value={
                 ["Política", "Futebol", "Economia"].includes(category)
                   ? ""
                   : category
               }
-              onChange={(e) => {
-                if (e.target.value) {
-                  setCategory(e.target.value);
-                  setPage(1);
-                }
-              }}
+              onChange={(e) => e.target.value && changeCategory(e.target.value)}
             >
               <option value="">Outros temas</option>
               {categories
@@ -111,18 +140,49 @@ export default function NewsPage() {
           <button onClick={() => setWizard(true)}>
             Adicionar fonte · avançado
           </button>
-          <button disabled={busy} onClick={() => setVersion((v) => v + 1)}>
+          <button
+            disabled={busy || saving}
+            onClick={() => setVersion((v) => v + 1)}
+          >
             <RefreshCw size={15} />
-            Atualizar
+            {busy ? "Atualizando…" : "Atualizar"}
           </button>
         </div>
       </div>
       <div className="news-source-strip">
-        {sources
-          .filter((s) => s.category === category && s.builtin_key)
-          .map((s) => (
-            <span key={s.id}>{s.name}</span>
-          ))}
+        <label>
+          Fonte de {category.toLocaleLowerCase("pt-BR")}
+          <select
+            aria-label="Fonte de notícias"
+            value={selectedId}
+            disabled={saving || !group.length}
+            onChange={(e) => choose(e.target.value)}
+          >
+            {group.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ·{" "}
+                {s.is_primary
+                  ? "Principal"
+                  : s.builtin_key
+                    ? "Alternativa"
+                    : "Minha fonte"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <small>
+          {group.filter((s) => s.builtin_key).length} fontes padrão · uma por
+          vez
+        </small>
+        {data?.selected_source?.checked_at && (
+          <small>
+            Última tentativa:{" "}
+            {formatInstant(data.selected_source.checked_at + "Z")}
+          </small>
+        )}
+        {items.some((i) => i.stale) && (
+          <small>Últimas manchetes disponíveis preservadas.</small>
+        )}
       </div>
       {wizard && (
         <SourceWizard
@@ -131,23 +191,20 @@ export default function NewsPage() {
           onSaved={() => {
             setWizard(false);
             setVersion((v) => v + 1);
-            api<Source[]>("/sources/bootstrap", { method: "POST" })
-              .then((r) => {
-                setSources(r);
-                setCategories([...new Set(r.map((s) => s.category))]);
-              })
-              .catch((e) => setError(e.message));
           }}
         />
       )}
       {error && (
         <p className="error" role="alert">
-          {error}
+          {error} Você pode escolher outra fonte acima.
         </p>
       )}
-      {busy ? (
-        <div className="panel empty">Carregando notícias…</div>
-      ) : items.length ? (
+      {busy && (
+        <p role="status" className="muted">
+          Consultando fonte…
+        </p>
+      )}
+      {items.length ? (
         <>
           <div className="news-hero">
             <NewsCarousel items={items.slice(0, 5)} />
@@ -179,7 +236,12 @@ export default function NewsPage() {
           )}
         </>
       ) : (
-        <div className="panel empty">Nenhuma notícia. Confira suas fontes.</div>
+        !busy && (
+          <div className="panel empty">
+            Nenhuma manchete disponível nesta fonte. Selecione uma alternativa
+            ou atualize.
+          </div>
+        )
       )}
     </>
   );

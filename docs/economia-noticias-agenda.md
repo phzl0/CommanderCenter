@@ -12,17 +12,17 @@ Os gráficos permitem selecionar períodos e agrupar por dia, semana ou mês. Ta
 
 ## Notícias
 
-Cada categoria tem três fontes fixas:
+Cada categoria tem três fontes fixas. Notícias consulta uma de cada vez, com a principal selecionada inicialmente. O seletor permite alternar para as outras duas ou uma fonte própria, e salva a escolha na sua conta. Fontes e conexões abre em Todas as fontes, mostrando as nove opções.
 
 | Categoria | Fontes |
 | --- | --- |
-| Política | G1 Política, Agência Câmara, Agência Senado |
-| Futebol | ge Futebol, UOL Futebol, ESPN Futebol |
-| Economia | G1 Economia, InfoMoney, IBGE |
+| Política | G1 Política (principal), UOL Política, CNN Brasil Política |
+| Futebol | ge Futebol (principal), UOL Futebol, ESPN Futebol |
+| Economia | G1 Economia (principal), InfoMoney, Valor Econômico |
 
 As fontes anteriores são preservadas. Fontes fixas não podem ser excluídas ou editadas. **Adicionar fonte — avançado** guia em três etapas: colar link, conferir nome/categoria e revisar as manchetes antes de salvar. Aceita domínio sem https, procura RSS anunciado e tenta extrair manchetes HTML. Fontes personalizadas podem usar outras categorias.
 
-O leitor aceita respostas de até 12 MB; imagens continuam limitadas a 2 MB. Mantém validação de endereços e proteção contra acesso à rede privada. Sites que bloqueiam robôs, exigem login ou dependem de JavaScript podem não funcionar: aumentar o limite não remove essas restrições. Falhas são isoladas por fonte; não se inventam manchetes. O IBGE apresentou indisponibilidade durante a validação externa; o sistema mostra o aviso correspondente.
+O leitor aceita respostas de até 12 MB; imagens continuam limitadas a 2 MB. Mantém validação de endereços e proteção contra acesso à rede privada. Sites que bloqueiam robôs, exigem login ou dependem de JavaScript podem não funcionar: aumentar o limite não remove essas restrições. Falhas são isoladas por fonte; não se inventam manchetes. As fontes padrão foram escolhidas entre veículos conhecidos com leitura pública verificada; não representam um ranking medido de audiência.
 
 ## Agenda
 
@@ -41,3 +41,11 @@ docker compose up --build -d
 ```
 
 Mantenha o volume privado e sua chave de criptografia nos backups existentes. Nenhuma configuração de deploy foi adicionada.
+
+## Correção 0.8.1
+
+Corrigida a conversão dos períodos numéricos recebidos pela URL, que causava erro 422 mesmo em filtros válidos. A consulta econômica aceita 24h, 7, 30, 90 e 365 dias. Dólar e Selic consultam uma pequena janela anterior para localizar a última referência quando não há publicação no dia. A data original é mantida e não se inventam valores horários.
+
+A atualização migra o catálogo anterior para as nove fontes acima, preserva os IDs das alternativas substituídas e mantém fontes personalizadas. Essa atualização acontece no primeiro acesso ao catálogo. Preferências são privadas por conta.
+
+Ao falhar uma atualização de indicadores ou de um card, a última consulta válida no mesmo período/configuração é preservada com aviso e data. Notícias mantém o cache da fonte com indicação de falha. A mudança de fonte ou categoria não exibe notícias da seleção anterior.

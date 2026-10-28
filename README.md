@@ -1,4 +1,4 @@
-# Command Center 0.8
+# Command Center 0.8.1
 
 Economia, notícias prontas por categoria e agenda com resumo do dia. [Guia desta versão](docs/economia-noticias-agenda.md).
 
