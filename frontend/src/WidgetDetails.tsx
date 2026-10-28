@@ -62,6 +62,7 @@ export default function WidgetDetails({
   const [widget, setWidget] = useState<Widget | null>(null),
     [data, setData] = useState<ChartData | null>(null),
     [days, setDays] = useState(30),
+    [interval, setInterval] = useState("day"),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [editing, setEditing] = useState(false),
@@ -73,7 +74,7 @@ export default function WidgetDetails({
     Promise.all([
       api<Widget>("/intelligence/widgets/" + encodeURIComponent(id)),
       api<ChartData>(
-        `/intelligence/widgets/${encodeURIComponent(id)}/data?days=${days}`,
+        `/intelligence/widgets/${encodeURIComponent(id)}/data?days=${days}&interval=${interval}`,
       ),
     ])
       .then(([w, d]) => {
@@ -87,14 +88,14 @@ export default function WidgetDetails({
     return () => {
       live = false;
     };
-  }, [id, days, version]);
+  }, [id, days, interval, version]);
   async function refresh() {
     setLoading(true);
     setError("");
     try {
       setData(
         await api<ChartData>(
-          `/intelligence/widgets/${encodeURIComponent(id)}/data?days=${days}&refresh=true`,
+          `/intelligence/widgets/${encodeURIComponent(id)}/data?days=${days}&interval=${interval}&refresh=true`,
         ),
       );
     } catch (e) {
@@ -151,17 +152,33 @@ export default function WidgetDetails({
             role="group"
             aria-label="Período dos detalhes"
           >
-            {[7, 30, 90].map((d) => (
+            {[1, 7, 30, 90, 365].map((d) => (
               <button
                 key={d}
                 className={days === d ? "active" : ""}
                 onClick={() => setDays(d)}
               >
-                {d} dias
+                {d === 1 ? "24 horas" : d === 365 ? "1 ano" : d + " dias"}
               </button>
             ))}
           </div>
+          <select
+            aria-label="Agrupamento dos detalhes"
+            value={interval}
+            onChange={(e) => {
+              setInterval(e.target.value);
+              if (e.target.value === "hour") setDays(1);
+            }}
+          >
+            <option value="hour">Horas</option>
+            <option value="day">Dias</option>
+            <option value="week">Semanas</option>
+            <option value="month">Meses</option>
+          </select>
         </div>
+      )}
+      {data?.period_note && (
+        <p className="muted period-note">{data.period_note}</p>
       )}
       {loading ? (
         <section className="panel empty">Carregando detalhes…</section>

@@ -14,3 +14,5 @@ createRoot(document.getElementById("root")!).render(
 );
 
 import "./simple.css";
+
+import "./economy.css";

@@ -44,6 +44,7 @@ export type Widget = {
 };
 export type WidgetInput = Omit<Widget, "id" | "position">;
 export type ChartData = {
+  period_note?: string;
   status: "ok" | "empty" | "needs_config" | "unavailable";
   source?: string;
   message?: string;

@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import {
   LayoutDashboard,
+  TrendingUp,
   ListTodo,
   FileSpreadsheet,
   Files,
@@ -21,6 +22,7 @@ import { Management } from "./Management";
 import { notify } from "./feedback";
 import { NotificationBell } from "./Notifications";
 const AccountPage = lazy(() => import("./AccountPage"));
+const Economy = lazy(() => import("./Economy"));
 const NewsPage = lazy(() => import("./NewsPage"));
 const DataWorkspace = lazy(() => import("./DataWorkspace"));
 const Agenda = lazy(() => import("./Agenda"));
@@ -38,9 +40,11 @@ type Tab =
   | "account"
   | "goals"
   | "agenda"
-  | "news";
+  | "news"
+  | "economy";
 const nav = [
   { id: "dashboard", label: "Visão geral", icon: LayoutDashboard },
+  { id: "economy", label: "Economia", icon: TrendingUp },
   { id: "news", label: "Notícias", icon: Rss },
   { id: "agenda", label: "Agenda", icon: CalendarDays },
 
@@ -391,6 +395,12 @@ export default function App() {
                   applyPreferences(u.preferences);
                 }}
               />
+            </Suspense>
+          ) : tab === "economy" ? (
+            <Suspense
+              fallback={<div className="empty">Carregando economia…</div>}
+            >
+              <Economy />
             </Suspense>
           ) : tab === "news" ? (
             <Suspense

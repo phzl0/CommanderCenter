@@ -24,6 +24,8 @@ type Item = {
   notify_email?: boolean;
   email_error?: string;
   email_sent_at?: string;
+  draft_start?: string;
+  draft_end?: string;
 };
 type Result = {
   events: Item[];
@@ -68,6 +70,23 @@ export default function Agenda({
     [google, setGoogle] = useState(false),
     [connected, setConnected] = useState(false),
     [emailReady, setEmailReady] = useState(false);
+  const [dashboard, setDashboard] = useState<{
+      summary: Record<string, number>;
+      conflict_ids: string[];
+      upcoming: Item[];
+      limited: boolean;
+    } | null>(null),
+    [kindFilter, setKindFilter] = useState("all"),
+    [search, setSearch] = useState("");
+  useEffect(() => {
+    let live = true;
+    api<typeof dashboard>(`/planning/dashboard?day=${day}`)
+      .then((r) => live && setDashboard(r))
+      .catch((e) => live && setError(e.message));
+    return () => {
+      live = false;
+    };
+  }, [day, version]);
   const [year, monthNumber] = month.split("-").map(Number),
     m = monthNumber - 1;
   useEffect(() => {
@@ -140,8 +159,8 @@ export default function Agenda({
     const f = new FormData(e.currentTarget);
     await run(async () => {
       await api(
-        "/planning/appointments" + (editing ? "/" + editing.id : ""),
-        send(editing ? "PUT" : "POST", {
+        "/planning/appointments" + (editing?.id ? "/" + editing.id : ""),
+        send(editing?.id ? "PUT" : "POST", {
           title: f.get("title"),
           notes: f.get("notes"),
           start_at: f.get("start_at"),
@@ -166,6 +185,35 @@ export default function Agenda({
       setMonth(initialDay.slice(0, 7));
     }
   }, [initialDay]);
+  function selectDay(value: string) {
+    setDay(value);
+    setMonth(value.slice(0, 7));
+  }
+  function offsetDay(delta: number) {
+    const d = new Date(day + "T12:00:00");
+    d.setDate(d.getDate() + delta);
+    selectDay(dateKey(d.getFullYear(), d.getMonth(), d.getDate()));
+  }
+  function duplicate(item: Item) {
+    const nextLocal = (value: string) => {
+      const d = new Date(localTime(value) + "Z");
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 16);
+    };
+    setEditing({
+      ...item,
+      draft_start: nextLocal(item.start_at),
+      draft_end: nextLocal(item.end_at),
+      id: "",
+      completed: false,
+      start_at: new Date(
+        new Date(item.start_at).getTime() + 86400000,
+      ).toISOString(),
+      end_at: new Date(
+        new Date(item.end_at).getTime() + 86400000,
+      ).toISOString(),
+    });
+  }
   const leading = (new Date(year, m, 1).getDay() + 6) % 7,
     total = new Date(year, m + 1, 0).getDate(),
     today = todayInAccount();
@@ -188,6 +236,60 @@ export default function Agenda({
           {error}
         </p>
       )}
+      {dashboard && (
+        <div className="agenda-summary">
+          {[
+            ["appointments", "Compromissos"],
+            ["pending", "Afazeres pendentes"],
+            ["notices", "Avisos"],
+            ["reminders", "Com lembrete"],
+            ["completed", "Concluídos"],
+          ].map(([key, label]) => (
+            <div className="panel" key={key}>
+              <span>{label}</span>
+              <strong>{dashboard.summary[key]}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="agenda-day-tools">
+        <div className="agenda-actions">
+          <button aria-label="Dia anterior" onClick={() => offsetDay(-1)}>
+            <ChevronLeft size={16} />
+          </button>
+          <input
+            aria-label="Ir para o dia"
+            type="date"
+            min="2000-01-01"
+            max="2100-12-31"
+            value={day}
+            onChange={(e) => e.target.value && selectDay(e.target.value)}
+          />
+          <button aria-label="Próximo dia" onClick={() => offsetDay(1)}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="agenda-actions">
+          <input
+            aria-label="Buscar registros da agenda"
+            placeholder="Buscar no dia…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            aria-label="Filtrar tipo da agenda"
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
+          >
+            <option value="all">Todos os registros</option>
+            {Object.entries(kinds).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
       <div className="calendar-layout">
         <section className="panel calendar-panel">
           <div className="calendar-heading">
@@ -295,6 +397,14 @@ export default function Agenda({
                 <p className="empty">Dia livre. Adicione um registro.</p>
               )}
               {[...data.events]
+                .filter(
+                  (item) =>
+                    (kindFilter === "all" ||
+                      (item.kind || "appointment") === kindFilter) &&
+                    item.title
+                      .toLocaleLowerCase()
+                      .includes(search.toLocaleLowerCase()),
+                )
                 .sort((a, b) => a.start_at.localeCompare(b.start_at))
                 .map((item) => (
                   <article
@@ -317,6 +427,12 @@ export default function Agenda({
                           formatInstant(item.end_at)}
                     </p>
                     {item.notes && <p>{item.notes}</p>}
+                    {dashboard?.conflict_ids.includes(item.id) && (
+                      <small className="agenda-conflict">
+                        Conflito de horário com outro compromisso local.
+                      </small>
+                    )}
+                    {item.email_sent_at && <small>E-mail enviado.</small>}
                     {item.reminder_minutes != null && (
                       <small>
                         Lembrete:{" "}
@@ -338,6 +454,13 @@ export default function Agenda({
                             onClick={() => setEditing(item)}
                           >
                             Editar
+                          </button>
+                          <button
+                            className="quiet"
+                            disabled={busy}
+                            onClick={() => duplicate(item)}
+                          >
+                            Duplicar para amanhã
                           </button>
                           {item.kind === "todo" && (
                             <button
@@ -391,13 +514,19 @@ export default function Agenda({
                     </div>
                   </article>
                 ))}
-              {data.tasks.map((task) => (
-                <article className="calendar-item" key={task.id}>
-                  <span className="badge">Afazer existente</span>
-                  <h3>{task.title}</h3>
-                  <a href={`/#/tarefa/${task.id}`}>Abrir</a>
-                </article>
-              ))}
+              {data.tasks
+                .filter(
+                  (t) =>
+                    (kindFilter === "all" || kindFilter === "todo") &&
+                    t.title.toLowerCase().includes(search.toLowerCase()),
+                )
+                .map((task) => (
+                  <article className="calendar-item" key={task.id}>
+                    <span className="badge">Afazer existente</span>
+                    <h3>{task.title}</h3>
+                    <a href={`/#/tarefa/${task.id}`}>Abrir</a>
+                  </article>
+                ))}
               {data.limited && (
                 <small>Há mais eventos no Google Calendar.</small>
               )}
@@ -405,6 +534,39 @@ export default function Agenda({
           )}
         </section>
       </div>
+      {dashboard && (
+        <section className="panel agenda-week">
+          <div className="panel-heading">
+            <h2>Próximos 7 dias</h2>
+            <small>Registros locais a partir do dia selecionado</small>
+          </div>
+          {dashboard.upcoming.length ? (
+            <div className="agenda-week-list">
+              {dashboard.upcoming.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    selectDay(localTime(item.start_at).slice(0, 10))
+                  }
+                >
+                  <span className="badge">
+                    {kinds[item.kind || "appointment"]}
+                  </span>
+                  <strong>{item.title}</strong>
+                  <small>{formatInstant(item.start_at)}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="empty compact">
+              Nenhum registro pendente nesse período.
+            </p>
+          )}
+          {dashboard.limited && (
+            <small>Exibindo os primeiros registros do período.</small>
+          )}
+        </section>
+      )}
       {editing !== undefined && (
         <div className="modal-backdrop">
           <section
@@ -415,7 +577,7 @@ export default function Agenda({
           >
             <div className="dialog-heading">
               <h2 id="appointment-title">
-                {editing ? "Editar registro" : "Novo registro"}
+                {editing?.id ? "Editar registro" : "Novo registro"}
               </h2>
               <button
                 className="icon-button"
@@ -457,7 +619,9 @@ export default function Agenda({
                     name="start_at"
                     required
                     defaultValue={
-                      editing ? localTime(editing.start_at) : day + "T09:00"
+                      editing
+                        ? editing.draft_start || localTime(editing.start_at)
+                        : day + "T09:00"
                     }
                   />
                 </label>
@@ -468,7 +632,9 @@ export default function Agenda({
                     name="end_at"
                     required
                     defaultValue={
-                      editing ? localTime(editing.end_at) : day + "T10:00"
+                      editing
+                        ? editing.draft_end || localTime(editing.end_at)
+                        : day + "T10:00"
                     }
                   />
                 </label>

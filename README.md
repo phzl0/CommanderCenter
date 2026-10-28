@@ -1,6 +1,6 @@
-# Command Center 0.7
+# Command Center 0.8
 
-Interface compacta, calendário com lembretes e dados/arquivos unificados. [Guia desta versão](docs/interface-simples.md).
+Economia, notícias prontas por categoria e agenda com resumo do dia. [Guia desta versão](docs/economia-noticias-agenda.md).
 
 
 Centro privado de informações, calendário e análise de documentos. Funciona sem IA. O nome do repositório é `CommanderCenter`; a aplicação usa a marca **Command Center**.

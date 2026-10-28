@@ -1,3 +1,4 @@
+import { getPreferences } from "./userPreferences";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -23,9 +24,17 @@ const palettes: Partial<Record<Kind, string[]>> = {
   teams: ["#a0bdf0"],
 };
 const axisLabel = (s: unknown) =>
-  typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
-    ? s.slice(8, 10) + "/" + s.slice(5, 7)
-    : String(s).slice(0, 14);
+  typeof s === "string" && /^\d{4}-\d{2}-\d{2}T/.test(s)
+    ? new Date(s).toLocaleString("pt-BR", {
+        timeZone: getPreferences().timezone,
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s)
+      ? s.slice(8, 10) + "/" + s.slice(5, 7)
+      : String(s).slice(0, 14);
 export default function WidgetChart({
   data,
   type,

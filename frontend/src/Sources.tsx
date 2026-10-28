@@ -1,3 +1,4 @@
+import SourceWizard from "./SourceWizard";
 import { useEffect, useState } from "react";
 import {
   Plus,
@@ -16,6 +17,7 @@ import { api, send } from "./api";
 import { confirmAction, dataChanged } from "./feedback";
 import NewsFeed, { type NewsItem } from "./NewsFeed";
 export type Source = {
+  builtin_key?: string | null;
   id: string;
   name: string;
   category: string;
@@ -32,6 +34,8 @@ type Preview = {
   candidates: string[];
 };
 export default function Sources() {
+  const [wizard, setWizard] = useState(false);
+  const [category, setCategory] = useState("Política");
   const [sources, setSources] = useState<Source[]>([]),
     [mode] = useState("sources"),
     [emailReady, setEmailReady] = useState(false),
@@ -54,6 +58,10 @@ export default function Sources() {
     return () => window.removeEventListener("cc-data-changed", changed);
   }, []);
   function edit(source: Source | null) {
+    if (!source) {
+      setWizard(true);
+      return;
+    }
     setEditing(source);
     setUrl(source?.url || "");
     setPreview(null);
@@ -128,10 +136,12 @@ export default function Sources() {
       setBusy(false);
     }
   }
-  const filtered = sources.filter((s) =>
-    (s.name + " " + s.category)
-      .toLocaleLowerCase()
-      .includes(search.toLocaleLowerCase()),
+  const filtered = sources.filter(
+    (s) =>
+      (s.category === category || category === "") &&
+      (s.name + " " + s.category)
+        .toLocaleLowerCase()
+        .includes(search.toLocaleLowerCase()),
   );
   return (
     <>
@@ -143,10 +153,27 @@ export default function Sources() {
         </div>
         <button className="primary" onClick={() => edit(null)}>
           <Plus size={16} />
-          Adicionar fonte
+          Adicionar fonte · avançado
         </button>
       </div>
       <div className="sources-toolbar">
+        <select
+          aria-label="Categoria das fontes"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          <option value="">Todas as fontes</option>
+          {[
+            ...new Set([
+              "Política",
+              "Futebol",
+              "Economia",
+              ...sources.map((s) => s.category),
+            ]),
+          ].map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
         {mode === "sources" && (
           <div className="search">
             <Search size={15} />
@@ -182,7 +209,7 @@ export default function Sources() {
                     role="switch"
                     aria-checked={s.enabled}
                     aria-label={"Ativar " + s.name}
-                    disabled={busy}
+                    disabled={busy || !!s.builtin_key}
                     onClick={() => toggle(s)}
                   >
                     <i />
@@ -212,20 +239,26 @@ export default function Sources() {
                         : "Aguardando primeira consulta")}
                   </span>
                 </div>
-                <div className="source-actions">
-                  <button className="quiet" onClick={() => edit(s)}>
-                    <Pencil size={14} />
-                    Editar
-                  </button>
-                  <button
-                    className="quiet danger"
-                    disabled={busy}
-                    onClick={() => remove(s)}
-                  >
-                    <Trash2 size={14} />
-                    Remover
-                  </button>
-                </div>
+                {s.builtin_key ? (
+                  <small className="source-fixed">
+                    Fonte padrão · pronta para uso
+                  </small>
+                ) : (
+                  <div className="source-actions">
+                    <button className="quiet" onClick={() => edit(s)}>
+                      <Pencil size={14} />
+                      Editar
+                    </button>
+                    <button
+                      className="quiet danger"
+                      disabled={busy}
+                      onClick={() => remove(s)}
+                    >
+                      <Trash2 size={14} />
+                      Remover
+                    </button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -245,6 +278,17 @@ export default function Sources() {
           </details>
         )}
       </section>
+      {wizard && (
+        <SourceWizard
+          category={category || "Política"}
+          onClose={() => setWizard(false)}
+          onSaved={() => {
+            setWizard(false);
+            load().catch((e) => setError(e.message));
+            dataChanged();
+          }}
+        />
+      )}
       {editing !== undefined && (
         <div className="modal-backdrop">
           <section

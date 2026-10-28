@@ -58,12 +58,14 @@ const icons = {
 function WidgetCard({
   widget,
   days,
+  interval,
   version,
   onEdit,
   onRecord,
 }: {
   widget: Widget;
   days: number;
+  interval: string;
   version: number;
   onEdit: () => void;
   onRecord: () => void;
@@ -77,7 +79,7 @@ function WidgetCard({
     setLoading(true);
     setError("");
     api<ChartData>(
-      `/intelligence/widgets/${widget.id}/data?days=${days}&refresh=${refresh > 0}`,
+      `/intelligence/widgets/${widget.id}/data?days=${days}&interval=${interval}&refresh=${refresh > 0}`,
     )
       .then((d) => live && setData(d))
       .catch((e) => live && setError(e.message))
@@ -85,7 +87,7 @@ function WidgetCard({
     return () => {
       live = false;
     };
-  }, [widget.id, widget.config, days, version, refresh]);
+  }, [widget.id, widget.config, days, interval, version, refresh]);
   const Icon = icons[widget.kind],
     hasData = data?.status === "ok",
     hasPoints = !!data?.chart?.points.length;
@@ -255,6 +257,9 @@ function WidgetCard({
               </a>
             )}
           </div>
+          {data?.period_note && (
+            <small className="period-note">{data.period_note}</small>
+          )}
           {data?.data_date && (
             <p className="data-date">Último dado: {data.data_date}</p>
           )}
@@ -292,6 +297,7 @@ function WidgetCard({
 export default function Intelligence({}: { user: User }) {
   const [widgets, setWidgets] = useState<Widget[]>([]),
     [days, setDays] = useState(30),
+    [interval, setInterval] = useState("day"),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState(""),
     [customizing, setCustomizing] = useState(false),
@@ -406,17 +412,30 @@ export default function Intelligence({}: { user: User }) {
             role="group"
             aria-label="Período dos gráficos"
           >
-            {[7, 30, 90].map((d) => (
+            {[1, 7, 30, 90, 365].map((d) => (
               <button
                 key={d}
                 className={days === d ? "active" : ""}
                 disabled={busy}
                 onClick={() => period(d)}
               >
-                {d}d
+                {d === 1 ? "24h" : d === 365 ? "1a" : d + "d"}
               </button>
             ))}
           </div>
+          <select
+            aria-label="Agrupar gráficos"
+            value={interval}
+            onChange={(e) => {
+              setInterval(e.target.value);
+              if (e.target.value === "hour") period(1);
+            }}
+          >
+            <option value="hour">Horas</option>
+            <option value="day">Dias</option>
+            <option value="week">Semanas</option>
+            <option value="month">Meses</option>
+          </select>
           <button onClick={() => setRecording(true)}>
             <Plus size={16} />
             Registrar dado
@@ -452,6 +471,7 @@ export default function Intelligence({}: { user: User }) {
               key={w.id}
               widget={w}
               days={days}
+              interval={interval}
               version={version}
               onEdit={() => setEditor({ widget: w })}
               onRecord={() => setRecording(true)}

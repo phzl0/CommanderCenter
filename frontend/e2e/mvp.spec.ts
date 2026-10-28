@@ -206,13 +206,17 @@ test("compact command center: five cards, news, calendar, files and exports", as
   await dialog
     .getByRole("combobox", { name: "Tipo", exact: true })
     .selectOption("todo");
-  await dialog.getByLabel("Início", { exact: true }).fill("2026-11-03T09:00");
-  await dialog.getByLabel("Fim", { exact: true }).fill("2026-11-03T09:30");
+  const calendarDay = new Date(Date.now() + 86400000)
+    .toISOString()
+    .slice(0, 10);
+  await dialog
+    .getByLabel("Início", { exact: true })
+    .fill(calendarDay + "T09:00");
+  await dialog.getByLabel("Fim", { exact: true }).fill(calendarDay + "T09:30");
   await dialog
     .getByRole("button", { name: "Salvar registro", exact: true })
     .click();
-  await page.getByRole("button", { name: "Próximo mês", exact: true }).click();
-  await page.getByRole("button", { name: /03\/11\/2026/ }).click();
+  await page.getByLabel("Ir para o dia", { exact: true }).fill(calendarDay);
   await expect(
     page.getByRole("heading", { name: "Revisar orçamento", exact: true }),
   ).toBeVisible();

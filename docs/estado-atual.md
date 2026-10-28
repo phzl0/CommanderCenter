@@ -1,3 +1,7 @@
+## Atualização 0.8
+
+Economia, fontes padrão por categoria, períodos dos gráficos e painel da agenda implementados. Consulte [o guia](economia-noticias-agenda.md).
+
 # Estado atual do Command Center — 0.7
 
 MVP local, privado e independente de IA. Interface compacta em grafite/azul e logo vetorial compartilhado com o favicon.
