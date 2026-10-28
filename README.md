@@ -1,165 +1,177 @@
-# Command Center 0.8.1
+# Command Center — Beta
 
-Economia, notícias prontas por categoria e agenda com resumo do dia. [Guia desta versão](docs/economia-noticias-agenda.md).
+> **Projeto em fase beta (0.8.1).** Recursos, interface e integrações ainda estão em evolução.
 
+## Comece aqui: executar no seu computador
 
-Centro privado de informações, calendário e análise de documentos. Funciona sem IA. O nome do repositório é `CommanderCenter`; a aplicação usa a marca **Command Center**.
+O **Command Center funciona localmente**, com Docker. Não precisa de Render, Vercel, chave de IA ou servidor contratado. Os dados ficam nos volumes do Docker deste computador. A primeira instalação e a consulta de fontes externas precisam de internet.
 
-## Funcionalidades
+Escolha seu sistema e execute os comandos na ordem. Se o repositório estiver privado, sua conta GitHub precisa ter permissão de acesso; use sua autenticação Git ou a URL SSH se já estiver configurada.
 
-- Autenticação privada, perfil, preferências e controle de sessões.
-- Visão geral com até cinco cards, quinto em largura inteira e tipos repetidos.
-- Notícias em página própria com imagens, categorias, manchetes e carrossel de dois segundos.
-- Calendário mensal com compromissos, afazeres, avisos e lembretes internos/e-mail.
-- Dados e arquivos: PDF, CSV, XLSX e XLS, filtros, cálculos e análises salvas.
-- Relatórios em PDF, CSV e Excel; download de originais.
-- Fontes RSS personalizadas e conexões GitHub, Microsoft e Google Calendar.
-- Registros pessoais/financeiros, clima por hora e indicadores econômicos.
-- Dados anteriores de tarefas, projetos e metas preservados; suas abas saíram do menu.
+### Linux
 
-## Executar no Ubuntu com Docker
+**1. Instale os requisitos:** Git, Python 3, Docker Engine e o plugin Docker Compose. Para instalar Docker, siga o [guia da sua distribuição](https://docs.docker.com/engine/install/) — [Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
 
-Requisitos: Git, Python 3 para a configuração inicial, Docker Engine e plugin Docker Compose. Não é necessário instalar Node, PostgreSQL ou bibliotecas Python no sistema para executar a aplicação.
+Confira no terminal:
 
-1. `git clone` baixa o código. `cd` entra na pasta do projeto:
+```bash
+git --version
+python3 --version
+docker --version
+docker compose version
+```
+
+**2. Baixe o projeto e crie a configuração local.** O script gera a senha do PostgreSQL e não sobrescreve um `.env` existente.
 
 ```bash
 git clone https://github.com/phzl0/CommanderCenter.git
 cd CommanderCenter
-```
-
-2. O script abaixo cria um `.env` local com uma senha aleatória para o banco. Não altera um `.env` existente e não exibe a senha:
-
-```bash
 python3 infra/init_env.py
 ```
 
-3. `docker compose up --build -d` constrói as imagens e inicia os serviços em segundo plano. O backend aplica as migrações antes de iniciar:
+**3. Construa e inicie os serviços.** A primeira execução pode demorar alguns minutos. As migrações do banco são automáticas.
 
 ```bash
-docker compose up --build -d
+sudo docker compose up --build -d
+sudo docker compose ps
+sudo docker compose logs -f backend
 ```
 
-4. `docker compose ps` mostra os serviços. `logs` permite acompanhar a inicialização. Aguarde a mensagem de inicialização da API antes de criar a conta:
+Aguarde a API iniciar. Use `Ctrl+C` para sair dos logs; os serviços continuam funcionando. Se seu usuário já tem acesso ao Docker, pode omitir `sudo`.
+
+**4. Crie sua conta.** Substitua o e-mail e o nome. Digite e confirme uma senha de 12 a 128 caracteres; ela não aparece no terminal.
 
 ```bash
+sudo docker compose exec backend python -m app.cli create-user --email "seu-email@exemplo.com" --name "Seu Nome"
+```
+
+**5. Abra [http://localhost:5173](http://localhost:5173)** e entre com a conta criada. Mantenha o Docker em execução durante o uso.
+
+### Windows — PowerShell
+
+**1. Instale os requisitos:** [Git](https://git-scm.com/downloads), [Python 3](https://www.python.org/downloads/windows/) e [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/). Use o backend WSL 2 e containers Linux no Docker Desktop. Siga os requisitos e reinicializações indicados pelo instalador.
+
+Abra o Docker Desktop, aguarde o mecanismo iniciar e abra um novo **PowerShell**. Confira:
+
+```powershell
+git --version
+py -3 --version
+docker --version
+docker compose version
+```
+
+Se `py` não existir, mas `python --version` funcionar e indicar Python 3, use `python` no lugar de `py -3` abaixo.
+
+**2. Baixe o projeto e crie a configuração local:**
+
+```powershell
+git clone https://github.com/phzl0/CommanderCenter.git
+cd CommanderCenter
+py -3 infra/init_env.py
+```
+
+**3. Construa e inicie os serviços:**
+
+```powershell
+docker compose up --build -d
 docker compose ps
 docker compose logs -f backend
 ```
 
-Use `Ctrl+C` para sair da visualização dos logs; os serviços continuam ativos.
+Aguarde a API iniciar. Use `Ctrl+C` para sair dos logs sem parar a aplicação.
 
-5. Crie sua conta. `exec` executa o comando dentro do backend. Substitua o e-mail e o nome; a senha será solicitada sem aparecer na tela (12 a 128 caracteres):
+**4. Crie sua conta** com e-mail, nome e senha próprios:
 
-```bash
-docker compose exec backend python -m app.cli create-user --email "seu-email@exemplo.com" --name "Paulo"
+```powershell
+docker compose exec backend python -m app.cli create-user --email "seu-email@exemplo.com" --name "Seu Nome"
 ```
 
-6. Abra **http://localhost:5173** e entre com a conta criada. API: **http://localhost:8000/docs**; verificação: **http://localhost:8000/api/health**.
+**5. Abra [http://localhost:5173](http://localhost:5173)** e entre. O Docker Desktop precisa permanecer em execução. Esses comandos são para PowerShell; não misture com comandos `sudo` do Linux.
 
-O banco fica na rede interna do Docker. Os serviços acessíveis pelo navegador ficam vinculados a `127.0.0.1`, para uso neste computador.
+### Atualizar, parar e resolver problemas
 
-## Atualizar e parar
-
-`git pull` baixa os novos commits. O segundo comando reconstrói os serviços; as migrações são executadas automaticamente:
+Na pasta `CommanderCenter`, baixe os commits e reconstrua os serviços:
 
 ```bash
 git pull --ff-only
 docker compose up --build -d
 ```
 
-Para parar, preservando os volumes:
+No Linux, acrescente `sudo` ao comando Docker se necessário. `git pull --ff-only` atualiza os arquivos sem criar um merge; se houver divergência de histórico, ele interrompe a atualização. O comando Docker aplica a versão atualizada. Se a página parecer antiga, recarregue com `Ctrl+Shift+R`.
+
+Para parar preservando seus dados:
 
 ```bash
 docker compose down
 ```
 
-Não acrescente `-v`: essa opção remove os volumes e apaga banco e arquivos locais. Guarde o `.env`; mudar a senha nele não altera a senha de um banco já inicializado.
+| Problema | O que fazer |
+| --- | --- |
+| `permission denied` em `/var/run/docker.sock` no Linux | Execute o comando Docker com `sudo`. Não altere as permissões do socket para acesso público. |
+| Docker não conecta no Windows | Abra o Docker Desktop e confira se o mecanismo de containers Linux está ativo. |
+| A página ainda não abre | Confira `docker compose ps` e `docker compose logs --tail=80 backend frontend`. Aguarde o término da inicialização. |
+| Login não funciona na primeira instalação | Crie a conta pelo comando acima. Não há usuário/senha padrão. |
+| Uma fonte externa falha | Veja o aviso e a data da consulta na tela. Sites podem bloquear leitura; notícias permitem trocar para uma alternativa. |
 
-## Contas
+**Não use `docker compose down -v` para atualizar:** `-v` remove os volumes, incluindo banco e arquivos. Preserve o `.env`; trocar sua senha não muda a senha de um PostgreSQL já inicializado. Antes de reinstalar ou migrar, consulte [backup e restauração](docs/backup.md).
 
-Redefinir senha invalida as sessões existentes:
+## Sobre o projeto
+
+O **Command Center** é um centro pessoal de informações e controle diário: reúne o que acontece no mercado com compromissos, tarefas pessoais, dados e documentos em um só lugar.
+
+O objetivo é facilitar a consulta de notícias, empresas, indicadores econômicos e da própria rotina. Funciona independentemente de IA e permite contas separadas, com registros privados por usuário. O repositório se chama `CommanderCenter`; a marca da aplicação é **Command Center**.
+
+### O que está disponível na beta
+
+- **Visão geral:** até cinco cards configuráveis, incluindo tipos repetidos; o quinto ocupa a largura inteira.
+- **Economia:** mapa de ações com altas/baixas e gráficos de Selic, dólar, PIB e IPCA.
+- **Notícias:** Política, Futebol e Economia, três fontes padrão por categoria, escolha de principal/alternativas e cadastro guiado de fonte própria.
+- **Agenda:** calendário, compromissos, afazeres, avisos, resumo do dia, próximos sete dias e alertas de conflito.
+- **Dados e arquivos:** importação de PDF, CSV, XLS e XLSX, filtros, cálculos, análises salvas e relatórios PDF/CSV/Excel.
+- **Perfil e segurança:** preferências, troca de senha e controle de sessões.
+- **Conexões opcionais:** GitHub, Microsoft e Google Calendar, além de clima e registros pessoais/financeiros.
+
+Projetos, atividades e metas anteriores permanecem preservados no banco; algumas dessas áreas saíram da navegação para simplificar a experiência atual.
+
+### Integrações e limites
+
+O núcleo local funciona sem conectar contas externas. Fontes de notícias, clima, cotações e contas conectadas dependem de internet e da disponibilidade dos respectivos provedores.
+
+- O mapa de ações permite configurar sua chave brapi em **Economia → Configurar cotações**. Sem chave, a cobertura inicial é limitada.
+- Dólar/Selic mantêm a frequência diária disponível; IPCA é mensal e PIB é trimestral. Selecionar 24h não cria uma série por hora.
+- Notícias usa uma fonte por vez em cada categoria. Sites com bloqueio, login ou conteúdo dependente de JavaScript podem não permitir leitura.
+- Para conectar contas, consulte [conexões pelo sistema](docs/conexoes-pelo-sistema.md). Credenciais de aplicativos OAuth precisam de configuração administrativa inicial; depois, cada usuário autoriza a própria conta pelo navegador.
+- Lembretes internos não exigem SMTP. Para e-mail, configure o envio conforme o ambiente local.
+- Importações têm limites de tamanho e estrutura; PDFs precisam conter texto extraível.
+
+Veja o [guia de Economia, Notícias e Agenda](docs/economia-noticias-agenda.md) e o [estado atual](docs/estado-atual.md).
+
+## Dados privados, contas e manutenção
+
+O PostgreSQL fica na rede interna do Docker. Interface e API ficam vinculadas a `127.0.0.1`, para acesso neste computador. **Esta configuração é local e não foi preparada para exposição pública.**
+
+O volume `postgres_data` guarda o banco. `private_storage` guarda arquivos e a chave de criptografia das integrações. Código e migrações ficam no Git; dados, segredos e `.env` não. Commit não substitui backup dos volumes.
+
+A primeira conta criada é administradora. Outras contas podem ser criadas pelo mesmo comando, com dados separados. Para redefinir uma senha, na pasta do projeto:
 
 ```bash
 docker compose exec backend python -m app.cli reset-password --email "seu-email@exemplo.com"
 ```
 
-Desativar conta também invalida sessões:
+A operação invalida as sessões existentes. No Linux, use `sudo` se necessário. Os comandos de conta também permitem `disable-user`, `grant-admin` e `revoke-admin`.
 
-```bash
-docker compose exec backend python -m app.cli disable-user --email "seu-email@exemplo.com"
-```
+Links de diagnóstico local: [saúde da API](http://localhost:8000/api/health) e [documentação da API](http://localhost:8000/docs).
 
-É possível criar outras contas pelo mesmo comando de criação. Cada usuário vê somente seus próprios registros, arquivos, análises e relatórios.
+## Tecnologias e documentação técnica
 
-## Dados e relatórios
+| Camada | Tecnologias |
+| --- | --- |
+| Interface | React, TypeScript, Vite, Recharts |
+| Backend | Python, FastAPI, SQLAlchemy, Alembic |
+| Banco relacional | PostgreSQL |
+| Dados e relatórios | Pandas, ReportLab |
+| Execução local | Docker e Docker Compose |
 
-- CSV: UTF-8 ou Latin-1; separador automático, vírgula, ponto e vírgula, tabulação ou barra vertical; decimal com ponto ou vírgula. Valores de filtros numéricos usam ponto decimal.
-- Excel: primeira aba inicialmente; seleção das demais na tela. A primeira linha deve conter cabeçalhos. Fórmulas não são executadas; os valores previamente calculados dependem de o Excel ter salvo o arquivo com esses resultados.
-- Limites iniciais: 10 MB por arquivo, 50.000 linhas e 100 colunas por aba; XLSX descompactado até 100 MB. Listagens de arquivos, análises e relatórios mostram os 1.000 mais recentes.
-- Prévia: até 50 linhas e 100 grupos. Cálculos e exportações CSV/Excel usam todos os dados filtrados dentro dos limites.
-- Contagem considera células não vazias da coluna; média ignora células vazias. Soma/média exigem tipo numérico.
-- CSV exporta os dados filtrados com `;` e UTF-8 BOM. Excel inclui abas de dados, resumo e agrupamentos. PDF contém os cálculos e uma prévia de até 200 linhas e 8 colunas, com os limites indicados.
-- Relatórios de gestão filtram por criação do registro ou realização da atividade, em UTC. Prazo das tarefas e indicadores de atraso usam a data em America/Sao_Paulo.
-- O relatório é uma fotografia no momento da geração; gerar outro recalcula os dados atuais.
-- Excluir uma importação remove seu original, análises e relatórios relacionados. Relatórios de gestão são independentes.
-- Reabrir e concluir uma tarefa gera um novo evento histórico. Apenas editar uma tarefa já concluída não duplica o evento. Atividades automáticas são preservadas; as manuais podem ser editadas.
+Arquitetura de monólito modular. Recursos centrais não dependem de IA. Consulte [arquitetura](docs/arquitetura.md), [verificação e testes](docs/verificacao.md), [backup](docs/backup.md) e [plano do MVP](docs/plano-mvp.md).
 
-## Estrutura e testes
-
-Backend: FastAPI, SQLAlchemy, Alembic, PostgreSQL, Pandas e ReportLab. Frontend: React, TypeScript e Vite. Monólito modular; nenhuma chave de IA ou integração externa é necessária.
-
-```bash
-cd backend
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q
-```
-
-Por padrão, os testes usam bancos SQLite temporários com chaves estrangeiras habilitadas. Para testar PostgreSQL, defina `TEST_DATABASE_URL` apontando para um banco descartável cujo nome termine em `_test`. A suíte aplica/desfaz migrações nesse banco; nunca use o banco pessoal.
-
-```bash
-cd frontend
-npm ci
-npm run build
-```
-
-O workflow de testes do GitHub verifica o backend com PostgreSQL 17 e o build do frontend. Não publica a aplicação.
-
-Veja [docs/verificacao.md](docs/verificacao.md), [docs/arquitetura.md](docs/arquitetura.md) e [docs/plano-mvp.md](docs/plano-mvp.md).
-
-## Persistência e backup
-
-O volume `postgres_data` contém o banco e `private_storage` contém os arquivos. Código e migrações ficam no Git; dados e `.env` não. Commit não é backup dos seus dados. Consulte [docs/backup.md](docs/backup.md) para salvar e restaurar ambos.
-
-Deploy, integrações adicionais, LangGraph e automações ficam para etapas futuras. Esta configuração é destinada ao uso local; não foi preparada para exposição pública.
-
-### Teste por navegador
-
-O job `compose-e2e` constrói e inicia os três serviços em um runner descartável, executa Playwright em Chromium e verifica persistência após reinício. Capturas desktop/celular e rastros de falha são guardados por sete dias nos artefatos do run. A conta de teste é criada somente no banco descartável com sufixo `_test`; ela não existe na instalação pessoal.
-
-## Visão geral configurável (0.2)
-
-Novo tema escuro azul, gráficos de área/linha/barras e painéis escolhidos por usuário. Projetos e Atividades saíram do menu; os dados existentes são mantidos. Inclui registro rápido pessoal/financeiro, painéis de tarefas, GitHub público, notícias, BCB, ações via chave opcional e análises salvas. Consulte [o guia do centro de informações](docs/intelligence-workspace.md) para fontes, limitações e atualização sem perder seus dados.
-
-## Fontes e leitura (0.3)
-
-Radar com manchetes e imagens, três fontes iniciais e RSS personalizados por categoria. Favoritos e histórico de leitura privados, detalhes por card com tabelas fora da página inicial, notificações internas e opção de desfazer exclusões compatíveis. Busca de empresas por nome/código/link (Alpha Vantage, chave opcional) e clima por cidade (Open-Meteo). Veja [o guia das fontes e detalhes](docs/sources-and-details.md) para uso, limites e atualização local.
-
-## Layout e contas conectadas (0.4)
-
-Quatro cards por padrão: dois indicadores fixos à esquerda, notícias com fotos em carrossel à direita e um card largo abaixo. A quantidade é ajustável e permite repetir tipos de card. [Guia do layout](docs/dashboard-layout.md).
-
-GitHub aceita link completo e seleção de repositórios públicos após conectar a conta. O novo card Tarefas do Teams consulta Planner/To Do em modo de leitura. OAuth requer registrar aplicativos e configurar o `.env`; [guia de ativação e limites](docs/connections.md). Nenhuma mensagem é acessada. A chave de criptografia das conexões acompanha o volume de arquivos privados: preserve esse volume no backup.
-
-## Tema de contraste e próximos passos
-
-Fundo preto, superfícies neutras e cores distintas por tipo de informação, com a mesma paleta nos gráficos da visão geral e dos detalhes. Consulte [o estado atual e as próximas etapas](docs/estado-atual.md) para distinguir recursos concluídos, ativação das conexões e evoluções futuras.
-
-## Meu dia e paleta harmônica
-
-Fundo azul muito escuro, tons próximos de azul/azul-marinho e verde-claro nos indicadores. A aba [Meu dia](docs/meu-dia.md) acrescenta captura rápida, contexto pessoal/profissional, até três prioridades, reagendamento, fechamento diário e revisão de sete dias. O guia de conexões inclui o diagnóstico de divergência de callback do GitHub; a URL de retorno também aparece na configuração do card.
-
-## Perfil, segurança e planejamento (0.6)
-
-Menu de perfil no canto superior direito; foto e dados privados; preferências persistentes; troca de senha e encerramento de sessões. Central de conexões com GitHub, Microsoft e Google Calendar. Tarefas com etiquetas, filtros e recorrências, metas ligadas a tarefas/tempo, agenda local e leitura de calendários Google, capacidade diária de referência e alertas internos acionáveis. [Guia de uso e limites](docs/perfil-e-planejamento.md).
+O GitHub Actions verifica backend com PostgreSQL, compilação do frontend e fluxos de navegador com Docker em ambiente descartável. Não publica a aplicação. Deploy fica para uma etapa futura.
