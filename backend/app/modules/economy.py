@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from urllib.parse import urlencode
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -197,12 +197,14 @@ def save_configuration(
 
 @router.get("/overview")
 def overview(
-    days: Literal[7, 30, 90, 365] = 90,
-    interval: Literal["day", "week", "month"] = "day",
+    days: int = Query(90, ge=1, le=365),
+    interval: Literal["hour", "day", "week", "month"] = "day",
     refresh: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    if days not in (1, 7, 30, 90, 365):
+        raise HTTPException(422, "Escolha 24h, 7, 30, 90 ou 365 dias.")
     db.scalar(select(User).where(User.id == user.id).with_for_update())
     row = settings_row(db, user)
     stamp = now()
@@ -214,6 +216,11 @@ def overview(
         and (stamp - row.cached_at).total_seconds() < (30 if refresh else 600)
     ):
         return {**row.cached_data, "cached": True}
+    previous = (
+        row.cached_data
+        if row.cached_data and row.cached_data.get("cache_key") == cache_key
+        else {}
+    )
     original_key = row.api_key
     db.commit()
     token = integrations.unpack(original_key) if original_key else ""
@@ -235,17 +242,32 @@ def overview(
                     data["message"] = "Variação mensal oficial do IPCA."
             return {
                 **(resample(data, interval) if code != "pib" else data),
+                "as_of": stamp.isoformat() + "Z",
                 "frequency": "Trimestral"
                 if code == "pib"
                 else "Mensal"
                 if code == "ipca"
                 else "Diária",
             }
-        except Exception:
+        except Exception as error:
+            old = previous.get("indicators", {}).get(code, {})
+            message = (
+                str(error)
+                if isinstance(error, providers.ProviderError)
+                else "A fonte oficial está indisponível; tente atualizar mais tarde."
+            )
+            if old.get("status") == "ok":
+                return {
+                    **old,
+                    "stale": True,
+                    "message": message,
+                    "period_note": "Última consulta válida preservada. " + message,
+                    "as_of": old.get("as_of") or previous.get("as_of"),
+                }
             return {
                 "status": "unavailable",
                 "source": "IBGE" if code == "pib" else "Banco Central",
-                "message": "A fonte oficial está indisponível; tente atualizar mais tarde.",
+                "message": message,
             }
 
     with ThreadPoolExecutor(max_workers=6) as pool:

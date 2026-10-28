@@ -181,7 +181,11 @@ def github_data(repository, start, end, getter=None):
 def macro_data(code, start, end):
     number, name, unit = SERIES[code]
     # IPCA is monthly: a wider window supplies meaningful points without manufacturing daily values.
-    beginning = end - timedelta(days=365) if code == "ipca" else start
+    beginning = (
+        end - timedelta(days=365)
+        if code == "ipca"
+        else min(start, end - timedelta(days=10))
+    )
     url = f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{number}/dados?formato=json&dataInicial={beginning:%d/%m/%Y}&dataFinal={end:%d/%m/%Y}"
     raw = get_json(url)
     if not isinstance(raw, list):
@@ -199,7 +203,14 @@ def macro_data(code, start, end):
                 }
             )
     points.sort(key=lambda p: p["label"])
+    points = [p for p in points if p["label"] <= end.isoformat()]
+    if code != "ipca":
+        in_window = [p for p in points if p["label"] >= start.isoformat()]
+        points = in_window or points[-1:]
     return {
+        "period_note": "Série diária oficial; sem cotações por hora. Fora dos dias de divulgação, exibimos a última referência disponível."
+        if code != "ipca"
+        else "Série mensal oficial; sem valores diários ou por hora.",
         "status": "ok" if points else "empty",
         "source": f"Banco Central · SGS {number}",
         "message": "Últimos 12 meses; divulgação mensal."

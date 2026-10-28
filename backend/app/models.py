@@ -203,6 +203,7 @@ class FinanceEntry(Owned, Base):
 
 
 class SourceSettings(Base):
+    preferred_sources: Mapped[dict | None] = mapped_column(JSON)
     catalogue_version: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0"
     )

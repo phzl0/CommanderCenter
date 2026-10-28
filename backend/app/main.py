@@ -20,7 +20,7 @@ from app.modules import (
     economy,
 )
 
-app = FastAPI(title="Command Center", version="0.8.0")
+app = FastAPI(title="Command Center", version="0.8.1")
 app.include_router(auth.router)
 app.include_router(management.router)
 app.include_router(files.router)

@@ -63,17 +63,17 @@ BUILTINS = [
         "rss",
     ),
     (
-        "politica-camara",
-        "Agência Câmara",
+        "politica-uol",
+        "UOL · Política",
         "Política",
-        "https://www.camara.leg.br/noticias/rss/ultimas-noticias",
-        "rss",
+        "https://noticias.uol.com.br/politica/",
+        "auto",
     ),
     (
-        "politica-senado",
-        "Agência Senado",
+        "politica-cnn",
+        "CNN Brasil · Política",
         "Política",
-        "https://www12.senado.leg.br/noticias/ultimas",
+        "https://www.cnnbrasil.com.br/politica/",
         "auto",
     ),
     (
@@ -105,7 +105,13 @@ BUILTINS = [
         "https://www.infomoney.com.br/feed/",
         "rss",
     ),
-    ("economia-ibge", "IBGE", "Economia", DEFAULTS[2][2], "ibge"),
+    (
+        "economia-valor",
+        "Valor Econômico",
+        "Economia",
+        "https://valor.globo.com/rss/valor",
+        "rss",
+    ),
 ]
 
 
@@ -134,17 +140,28 @@ class ArticleInput(StrictModel):
 
 def ensure_sources(db, user):
     setting = db.get(SourceSettings, user.id)
-    if setting and setting.catalogue_version >= 1:
+    if setting and setting.catalogue_version >= 2:
         return
     db.scalar(select(User).where(User.id == user.id).with_for_update())
     setting = db.get(SourceSettings, user.id, populate_existing=True)
-    if setting and setting.catalogue_version >= 1:
+    if setting and setting.catalogue_version >= 2:
         return
     if not setting:
         setting = SourceSettings(owner_id=user.id)
         db.add(setting)
+    replacements = {
+        "politica-uol": "politica-camara",
+        "politica-cnn": "politica-senado",
+        "economia-valor": "economia-ibge",
+    }
     for key, name, category, url, kind in BUILTINS:
         row = db.scalar(
+            select(NewsSource).where(
+                NewsSource.owner_id == user.id,
+                NewsSource.builtin_key.in_([key, replacements.get(key, key)]),
+            )
+        )
+        row = row or db.scalar(
             select(NewsSource).where(
                 NewsSource.owner_id == user.id, NewsSource.url == url
             )
@@ -161,13 +178,18 @@ def ensure_sources(db, user):
         if not row:
             row = NewsSource(owner_id=user.id, url=url)
             db.add(row)
+        if row.url != url:
+            row.url = url
+            row.cached_items = None
+            row.checked_at = None
+            row.last_error = None
         row.builtin_key = key
         row.name = name
         row.category = category
         row.kind = kind
         row.enabled = True
         row.deleted_at = None
-    setting.catalogue_version = 1
+    setting.catalogue_version = 2
     db.flush()
 
 
@@ -178,9 +200,17 @@ def active_source(db, user, identity):
     return row
 
 
+PRIMARY_KEYS = {"politica-g1", "futebol-ge", "economia-g1"}
+
+
 def source_dict(row):
     return {
-        k: v for k, v in dump(row).items() if k not in ("cached_items", "deleted_at")
+        "is_primary": row.builtin_key in PRIMARY_KEYS,
+        **{
+            k: v
+            for k, v in dump(row).items()
+            if k not in ("cached_items", "deleted_at")
+        },
     }
 
 
@@ -589,14 +619,75 @@ def load_feed(source):
 def bootstrap(db: Session = Depends(get_db), user: User = Depends(current_user)):
     ensure_sources(db, user)
     db.commit()
+    preferences = db.get(SourceSettings, user.id).preferred_sources or {}
     return [
-        source_dict(s)
+        {
+            **source_dict(s),
+            "is_selected": preferences.get(
+                s.category, s.id if s.builtin_key in PRIMARY_KEYS else None
+            )
+            == s.id,
+        }
         for s in db.scalars(
             select(NewsSource)
             .where(NewsSource.owner_id == user.id, NewsSource.deleted_at.is_(None))
             .order_by(NewsSource.created_at, NewsSource.id)
         )
     ]
+
+
+class SourcePreference(StrictModel):
+    category: str = Field(min_length=1, max_length=80)
+    source_id: str = Field(min_length=1, max_length=36)
+
+
+@router.put("/preference")
+def choose_source(
+    data: SourcePreference,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    ensure_sources(db, user)
+    source = active_source(db, user, data.source_id)
+    if source.category != data.category or not source.enabled:
+        raise HTTPException(422, "Escolha uma fonte ativa desta categoria.")
+    db.scalar(select(User).where(User.id == user.id).with_for_update())
+    settings = db.get(SourceSettings, user.id)
+    settings.preferred_sources = {
+        **(settings.preferred_sources or {}),
+        data.category: source.id,
+    }
+    db.commit()
+    return {**source_dict(source), "is_selected": True}
+
+
+def category_sources(db, user, category):
+    ensure_sources(db, user)
+    return list(
+        db.scalars(
+            select(NewsSource)
+            .where(
+                NewsSource.owner_id == user.id,
+                NewsSource.deleted_at.is_(None),
+                NewsSource.enabled.is_(True),
+                NewsSource.category == category,
+            )
+            .order_by(NewsSource.created_at, NewsSource.id)
+        )
+    )
+
+
+def selected_source(db, user, category, identity=""):
+    sources = category_sources(db, user, category)
+    if identity:
+        row = next((s for s in sources if s.id == identity), None)
+        if not row:
+            raise HTTPException(404, "Fonte não encontrada nesta categoria.")
+        return row, sources
+    preference = (db.get(SourceSettings, user.id).preferred_sources or {}).get(category)
+    row = next((s for s in sources if s.id == preference), None)
+    row = row or next((s for s in sources if s.builtin_key in PRIMARY_KEYS), None)
+    return row or (sources[0] if sources else None), sources
 
 
 @router.post("/preview")

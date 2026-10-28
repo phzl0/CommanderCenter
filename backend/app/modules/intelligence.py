@@ -661,6 +661,19 @@ def widget_data(
             fingerprint="widget:" + row.id,
         )
         db.commit()
+        if (
+            row.cache_key == key
+            and row.cached_data
+            and row.cached_data.get("status") == "ok"
+            and row.cached_at
+        ):
+            return {
+                **row.cached_data,
+                "stale": True,
+                "cached": True,
+                "as_of": row.cached_at.isoformat() + "Z",
+                "period_note": "Última consulta válida preservada. " + str(error),
+            }
         return {
             "status": "unavailable",
             "message": str(error),
@@ -788,12 +801,20 @@ def city_search(
 
 @router.get("/news")
 def news_page(
-    category: str = Query("", max_length=80),
+    category: str = Query("Política", max_length=80),
+    source_id: str = Query("", max_length=36),
     refresh: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    selected, sources = newsroom.selected_source(db, user, category, source_id)
     config = WidgetConfig()
     config.news_category = category
+    config.news_source_ids = [selected.id] if selected else []
     start, end = date_range(30, user_zone(db, user))
-    return newsroom.aggregate(db, user, config, start, end, refresh)
+    data = newsroom.aggregate(db, user, config, start, end, refresh)
+    return {
+        **data,
+        "selected_source": newsroom.source_dict(selected) if selected else None,
+        "available_sources": [newsroom.source_dict(s) for s in sources],
+    }
