@@ -488,6 +488,18 @@ def html_headlines(raw, base):
         visit(node)
     unique = {}
     for item in structured + finder.items:
+        address = urlparse(item["url"])
+        # Known publishers include navigation and promotional links in article lists.
+        if (
+            address.hostname == "www12.senado.leg.br"
+            and "/noticias/materias/" not in address.path
+        ):
+            continue
+        if (
+            address.hostname == "www.espn.com.br"
+            and "/artigo/_/id/" not in address.path
+        ):
+            continue
         unique.setdefault(item["url"], item)
         if len(unique) >= 40:
             break
