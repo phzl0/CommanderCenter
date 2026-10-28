@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import current_user
 from app.core.preferences import preferences, user_zone
-from app.models import User, Goal, Task, PersonalEntry, Appointment
+from app.models import User, Goal, Task, PersonalEntry, Appointment, now
 from app.modules.management import StrictModel, dump, owned
 from app.modules import integrations, providers
 
@@ -459,3 +459,54 @@ def reminder_status(user: User = Depends(current_user)):
     from app.modules.reminders import email_configured
 
     return {"email_configured": email_configured(), "interval_seconds": 30}
+
+
+@router.get("/dashboard")
+def dashboard(
+    day: date | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    zone = user_zone(db, user)
+    day = day or datetime.now(zone).date()
+    if not 2000 <= day.year <= 2100:
+        raise HTTPException(422, "Data fora do intervalo permitido.")
+    start = utc_value(datetime.combine(day, time.min), zone)
+    end = utc_value(datetime.combine(day + timedelta(days=7), time.min), zone)
+    rows = list(
+        db.scalars(
+            select(Appointment)
+            .where(
+                Appointment.owner_id == user.id,
+                Appointment.start_at < end,
+                Appointment.end_at > start,
+            )
+            .order_by(Appointment.start_at)
+            .limit(500)
+        )
+    )
+    today_end = utc_value(datetime.combine(day + timedelta(days=1), time.min), zone)
+    selected = [r for r in rows if r.start_at < today_end and r.end_at > start]
+    events = [r for r in selected if r.kind == "appointment" and not r.completed]
+    conflicts = set()
+    for i, a in enumerate(events):
+        for b in events[i + 1 :]:
+            if b.start_at < a.end_at and a.start_at < b.end_at:
+                conflicts.update([a.id, b.id])
+    upcoming = [r for r in rows if not r.completed and r.end_at > now()]
+    return {
+        "day": day,
+        "timezone": str(zone),
+        "summary": {
+            "appointments": sum(r.kind == "appointment" for r in selected),
+            "pending": sum(r.kind == "todo" and not r.completed for r in selected),
+            "notices": sum(r.kind == "notice" for r in selected),
+            "reminders": sum(
+                r.reminder_minutes is not None and not r.completed for r in selected
+            ),
+            "completed": sum(r.completed for r in selected),
+        },
+        "conflict_ids": sorted(conflicts),
+        "upcoming": [event_view(r) for r in upcoming[:20]],
+        "limited": len(rows) >= 500,
+    }

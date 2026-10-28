@@ -17,9 +17,10 @@ from app.modules import (
     daily,
     account,
     planning,
+    economy,
 )
 
-app = FastAPI(title="Command Center", version="0.7.0")
+app = FastAPI(title="Command Center", version="0.8.0")
 app.include_router(auth.router)
 app.include_router(management.router)
 app.include_router(files.router)
@@ -31,6 +32,7 @@ app.include_router(integrations.router)
 app.include_router(daily.router)
 app.include_router(account.router)
 app.include_router(planning.router)
+app.include_router(economy.router)
 
 
 @app.middleware("http")

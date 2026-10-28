@@ -121,7 +121,7 @@ class WidgetInput(StrictModel):
 
 
 class PeriodInput(StrictModel):
-    days: Literal[7, 30, 90] | None = None
+    days: Literal[1, 7, 30, 90, 365] | None = None
     card_limit: int | None = Field(default=None, ge=1, le=5)
 
 
@@ -594,18 +594,21 @@ def analysis_data(db, user, config):
 @router.get("/widgets/{identity}/data")
 def widget_data(
     identity: str,
-    days: int = Query(30, ge=7, le=90),
+    days: int = Query(30, ge=1, le=365),
+    interval: Literal["hour", "day", "week", "month"] = "day",
     refresh: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    if days not in (7, 30, 90):
-        raise HTTPException(422, "Escolha 7, 30 ou 90 dias.")
+    if days not in (1, 7, 30, 90, 365):
+        raise HTTPException(422, "Escolha 1, 7, 30, 90 ou 365 dias.")
     row = active_widget(db, user, identity)
     config = WidgetConfig(**row.config)
     start, end = date_range(days, user_zone(db, user))
     key = hashlib.sha256(
-        json.dumps([days, end.isoformat(), row.config], sort_keys=True).encode()
+        json.dumps(
+            [days, end.isoformat(), interval, row.config], sort_keys=True
+        ).encode()
     ).hexdigest()
     external = row.kind in ("github", "news", "macro", "stock", "weather", "teams")
     if (
@@ -692,6 +695,52 @@ def widget_data(
             "message": "A fonte retornou dados incompatíveis. Tente atualizar mais tarde.",
             "as_of": None,
         }
+    from app.modules.timeframes import resample
+
+    if interval == "hour" and row.kind == "tasks":
+        from datetime import timezone
+
+        zone = user_zone(db, user)
+        current = datetime.now(zone).replace(minute=0, second=0, microsecond=0)
+        hours = min(48, days * 24)
+        begin = current - timedelta(hours=hours - 1)
+        buckets = {
+            (begin + timedelta(hours=i)).isoformat(timespec="minutes"): 0
+            for i in range(hours)
+        }
+        timestamps = db.scalars(
+            select(Task.completed_at).where(
+                Task.owner_id == user.id,
+                Task.status == "completed",
+                Task.completed_at
+                >= begin.astimezone(timezone.utc).replace(tzinfo=None),
+            )
+        )
+        for stamp in timestamps:
+            key = (
+                stamp.replace(tzinfo=timezone.utc)
+                .astimezone(zone)
+                .replace(minute=0, second=0, microsecond=0)
+                .isoformat(timespec="minutes")
+            )
+            if key in buckets:
+                buckets[key] += 1
+        if data.get("kpis"):
+            data["kpis"][0]["value"] = sum(buckets.values())
+        data = {
+            **data,
+            "chart": providers.series_chart(
+                [{"label": k, "value": v} for k, v in buckets.items()],
+                [{"key": "value", "name": "Conclusões por hora", "color": "#93c5fd"}],
+            ),
+            "period_note": f"Últimas {hours} horas · {zone}.",
+        }
+    elif row.kind != "weather":
+        data = resample(
+            data,
+            interval,
+            additive=row.kind in ("tasks", "personal", "finance", "github"),
+        )
     stamp = now()
     if external:
         row.cached_data = data
@@ -744,8 +793,7 @@ def news_page(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    old = next((w for w in widgets_for(db, user) if w.kind == "news"), None)
-    config = WidgetConfig(**(old.config if old else {}))
+    config = WidgetConfig()
     config.news_category = category
     start, end = date_range(30, user_zone(db, user))
     return newsroom.aggregate(db, user, config, start, end, refresh)

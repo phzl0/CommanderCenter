@@ -60,7 +60,7 @@ def test_discovery_preview_and_own_sources(client, monkeypatch):
 
     monkeypatch.setattr(newsroom, "public_fetch", fetch)
     initial = client.post("/api/sources/bootstrap").json()
-    assert len(initial) == 3 and len({s["name"] for s in initial}) == 3
+    assert len(initial) == 9 and len({s["name"] for s in initial}) == 9
     r = client.post("/api/sources/preview", json={"url": "https://news.example.com/"})
     assert r.status_code == 200, r.text
     assert r.json()["resolved_url"] == "https://news.example.com/feed"
@@ -105,7 +105,7 @@ def test_source_aggregation_keywords_dedup_and_reading(client, monkeypatch):
     w = next(w for w in workspace["widgets"] if w["kind"] == "news")
     data = client.get("/api/intelligence/widgets/" + w["id"] + "/data").json()
     assert data["status"] == "ok" and len(data["items"]) == 1
-    assert len(data["items"][0]["other_sources"]) == 3
+    assert len(data["items"][0]["other_sources"]) == 9
     assert "chart" not in data
     item = data["items"][0]
     r = client.post(

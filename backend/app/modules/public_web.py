@@ -74,7 +74,7 @@ class PinnedHTTPS(http.client.HTTPSConnection):
             raise
 
 
-def public_fetch(url, max_bytes=2 * 1024 * 1024):
+def public_fetch(url, max_bytes=12 * 1024 * 1024):
     deadline = time.monotonic() + 18
     try:
         for _ in range(4):
@@ -105,6 +105,10 @@ def public_fetch(url, max_bytes=2 * 1024 * 1024):
                         raise ProviderError("Redirecionamento inválido da fonte.")
                     url = urljoin(url, location)
                     continue
+                if response.status in (401, 403):
+                    raise ProviderError(
+                        "O site bloqueou a leitura automática. Use outra fonte pronta ou um RSS público do próprio site."
+                    )
                 if response.status != 200:
                     raise ProviderError(
                         "A fonte não respondeu com sucesso. Confira o link e tente mais tarde."
@@ -129,7 +133,7 @@ def public_fetch(url, max_bytes=2 * 1024 * 1024):
                     result.extend(chunk)
                     if len(result) > max_bytes:
                         raise ProviderError(
-                            "A resposta da fonte excedeu o limite permitido."
+                            f"A resposta ultrapassou {max_bytes // (1024 * 1024)} MB. Tente o link da categoria ou um RSS mais específico."
                         )
                 return bytes(result), response.getheader("Content-Type", ""), url
             finally:

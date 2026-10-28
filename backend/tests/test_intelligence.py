@@ -170,7 +170,7 @@ def test_providers_cache_and_failure_isolation(client, monkeypatch):
     )
     assert client.get("/api/tasks").status_code == 200
     assert (
-        client.get(f"/api/intelligence/widgets/{w['id']}/data?days=365").status_code
+        client.get(f"/api/intelligence/widgets/{w['id']}/data?days=366").status_code
         == 422
     )
 
@@ -262,7 +262,7 @@ def test_analysis_chart_and_cross_user_reference(client):
 
 
 def test_github_validation_and_stock_key_not_exposed(client, monkeypatch):
-    ws=bootstrap(client)
+    ws = bootstrap(client)
     client.delete("/api/intelligence/widgets/" + ws["widgets"][0]["id"])
     assert (
         client.post(

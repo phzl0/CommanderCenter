@@ -203,11 +203,15 @@ class FinanceEntry(Owned, Base):
 
 
 class SourceSettings(Base):
+    catalogue_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
     __tablename__ = "source_settings"
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
 
 
 class NewsSource(Owned, Base):
+    builtin_key: Mapped[str | None] = mapped_column(String(50))
     __tablename__ = "news_sources"
     name: Mapped[str] = mapped_column(String(100))
     category: Mapped[str] = mapped_column(String(80))
@@ -351,3 +355,11 @@ class Appointment(Owned, Base):
     email_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
     email_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
     email_error: Mapped[str | None] = mapped_column(String(300))
+
+
+class EconomySettings(Base):
+    __tablename__ = "economy_settings"
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    api_key: Mapped[str | None] = mapped_column(Text)
+    cached_data: Mapped[dict | None] = mapped_column(JSON)
+    cached_at: Mapped[datetime | None] = mapped_column(DateTime)

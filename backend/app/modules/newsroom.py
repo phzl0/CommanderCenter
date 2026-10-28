@@ -6,14 +6,14 @@ import json
 import re
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from urllib.parse import urlparse, urljoin, urlencode, parse_qsl, urlunparse
 from defusedxml import ElementTree
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import Field
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.db import get_db
@@ -54,6 +54,61 @@ DEFAULTS = [
 ]
 
 
+BUILTINS = [
+    (
+        "politica-g1",
+        "G1 · Política",
+        "Política",
+        "https://g1.globo.com/rss/g1/politica/",
+        "rss",
+    ),
+    (
+        "politica-camara",
+        "Agência Câmara",
+        "Política",
+        "https://www.camara.leg.br/noticias/rss/ultimas-noticias",
+        "rss",
+    ),
+    (
+        "politica-senado",
+        "Agência Senado",
+        "Política",
+        "https://www12.senado.leg.br/noticias/ultimas",
+        "auto",
+    ),
+    (
+        "futebol-ge",
+        "ge · Futebol",
+        "Futebol",
+        "https://ge.globo.com/rss/ge/futebol/",
+        "rss",
+    ),
+    (
+        "futebol-uol",
+        "UOL · Futebol",
+        "Futebol",
+        "https://www.uol.com.br/esporte/futebol/ultimas/index.xml",
+        "auto",
+    ),
+    (
+        "futebol-espn",
+        "ESPN · Futebol",
+        "Futebol",
+        "https://www.espn.com.br/futebol/",
+        "auto",
+    ),
+    ("economia-g1", "G1 · Economia", "Economia", DEFAULTS[1][2], "rss"),
+    (
+        "economia-infomoney",
+        "InfoMoney",
+        "Economia",
+        "https://www.infomoney.com.br/feed/",
+        "rss",
+    ),
+    ("economia-ibge", "IBGE", "Economia", DEFAULTS[2][2], "ibge"),
+]
+
+
 class SourceInput(StrictModel):
     name: str = Field(min_length=1, max_length=100)
     category: str = Field(min_length=1, max_length=80)
@@ -78,18 +133,41 @@ class ArticleInput(StrictModel):
 
 
 def ensure_sources(db, user):
-    if db.get(SourceSettings, user.id):
+    setting = db.get(SourceSettings, user.id)
+    if setting and setting.catalogue_version >= 1:
         return
     db.scalar(select(User).where(User.id == user.id).with_for_update())
-    if db.get(SourceSettings, user.id):
+    setting = db.get(SourceSettings, user.id, populate_existing=True)
+    if setting and setting.catalogue_version >= 1:
         return
-    db.add(SourceSettings(owner_id=user.id))
-    for name, category, url, kind in DEFAULTS:
-        db.add(
-            NewsSource(
-                owner_id=user.id, name=name, category=category, url=url, kind=kind
+    if not setting:
+        setting = SourceSettings(owner_id=user.id)
+        db.add(setting)
+    for key, name, category, url, kind in BUILTINS:
+        row = db.scalar(
+            select(NewsSource).where(
+                NewsSource.owner_id == user.id, NewsSource.url == url
             )
         )
+        if (
+            row
+            and not row.builtin_key
+            and (
+                row.name not in [name, "G1 · Economia", "IBGE"]
+                or row.category not in [category, "Economia e bolsa", "Indicadores"]
+            )
+        ):
+            row = None
+        if not row:
+            row = NewsSource(owner_id=user.id, url=url)
+            db.add(row)
+        row.builtin_key = key
+        row.name = name
+        row.category = category
+        row.kind = kind
+        row.enabled = True
+        row.deleted_at = None
+    setting.catalogue_version = 1
     db.flush()
 
 
@@ -296,41 +374,169 @@ def parse_feed(raw, base):
     return providers.clean(title), items
 
 
+class HeadlineFinder(HTMLParser):
+    def __init__(self, base):
+        super().__init__()
+        self.base = base
+        self.items = []
+        self.link = None
+        self.text = []
+        self.image = ""
+        self.title = []
+        self.in_title = False
+        self.skip = 0
+        self.script = False
+        self.scripts = []
+        self.script_text = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag in ("nav", "header", "footer", "style", "noscript"):
+            self.skip += 1
+        if tag == "script":
+            self.script = attrs.get("type") == "application/ld+json"
+            self.script_text = []
+            return
+        if tag == "title":
+            self.in_title = True
+        if tag == "a" and not self.skip and len(self.items) < 200:
+            self.link = urljoin(self.base, attrs.get("href", ""))
+            self.text = []
+            self.image = ""
+        if tag == "img" and self.link:
+            src = attrs.get("src") or attrs.get("data-src") or ""
+            if src and not src.startswith("data:"):
+                self.image = urljoin(self.base, src)
+
+    def handle_data(self, data):
+        if self.script:
+            self.script_text.append(data)
+        if self.in_title:
+            self.title.append(data)
+        if self.link and not self.skip:
+            self.text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("nav", "header", "footer", "style", "noscript"):
+            self.skip = max(0, self.skip - 1)
+        if tag == "script":
+            if self.script:
+                try:
+                    self.scripts.append(json.loads("".join(self.script_text)))
+                except (ValueError, RecursionError):
+                    pass
+            self.script = False
+        if tag == "title":
+            self.in_title = False
+        if tag == "a" and self.link:
+            title = providers.clean(" ".join(self.text))
+            parsed = urlparse(self.link)
+            if (
+                35 <= len(title) <= 500
+                and parsed.hostname == urlparse(self.base).hostname
+                and len(parsed.path) > 10
+            ):
+                item = clean_item(title, self.link, "", self.image, "")
+                if item:
+                    self.items.append(item)
+            self.link = None
+
+
+def html_headlines(raw, base):
+    finder = HeadlineFinder(base)
+    finder.feed(raw.decode("utf-8", "replace"))
+    structured = []
+
+    def visit(node, depth=0):
+        if depth > 15 or len(structured) >= 60:
+            return
+        if isinstance(node, list):
+            for item in node[:500]:
+                visit(item, depth + 1)
+        elif isinstance(node, dict):
+            types = node.get("@type", [])
+            types = [types] if isinstance(types, str) else types
+            if isinstance(types, list) and any(
+                t in ("NewsArticle", "Article", "ReportageNewsArticle") for t in types
+            ):
+                image = node.get("image", "")
+                if isinstance(image, list):
+                    image = image[0] if image else ""
+                if isinstance(image, dict):
+                    image = image.get("url", "")
+                entity = node.get("mainEntityOfPage", "")
+                address = node.get("url") or (
+                    entity.get("@id", "") if isinstance(entity, dict) else entity
+                )
+                if isinstance(address, str) and address:
+                    item = clean_item(
+                        node.get("headline", ""),
+                        urljoin(base, address),
+                        node.get("description", ""),
+                        urljoin(base, image)
+                        if isinstance(image, str) and image
+                        else "",
+                        node.get("datePublished", ""),
+                    )
+                    if item:
+                        structured.append(item)
+            for child in node.values():
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+
+    for node in finder.scripts:
+        visit(node)
+    unique = {}
+    for item in structured + finder.items:
+        unique.setdefault(item["url"], item)
+        if len(unique) >= 40:
+            break
+    if not unique:
+        raise providers.ProviderError(
+            "Não encontramos manchetes nesta página. Ela pode exigir JavaScript. Escolha uma fonte pronta ou um RSS público."
+        )
+    return providers.clean("".join(finder.title))[:100] or urlparse(
+        base
+    ).hostname, list(unique.values())
+
+
+def read_public_news(url):
+    raw, content_type, final = public_fetch(url)
+    if "html" not in content_type.lower() and not raw.lstrip().lower().startswith(
+        (b"<!doctype html", b"<html")
+    ):
+        title, items = parse_feed(raw, final)
+        return title, items, final, "rss", []
+    finder = FeedFinder()
+    finder.feed(raw.decode("utf-8", "replace"))
+    candidates = [urljoin(final, link) for link in finder.links[:2]]
+    for candidate in candidates:
+        try:
+            validate_url(candidate)
+            body, _, resolved = public_fetch(candidate)
+            title, items = parse_feed(body, resolved)
+            return title, items, resolved, "rss", candidates
+        except providers.ProviderError:
+            continue
+    title, items = html_headlines(raw, final)
+    return title, items, final, "auto", candidates
+
+
 def preview_url(url):
     validate_url(url)
     if url == DEFAULTS[2][2]:
         title, items = load_feed({"kind": "ibge", "url": url, "name": "IBGE"})
-        return {
-            "resolved_url": url,
-            "title": title,
-            "items": items[:3],
-            "candidates": [],
-        }
-    raw, content_type, final = public_fetch(url)
-    candidates = []
-    if "html" in content_type.lower() or raw.lstrip().lower().startswith(
-        (b"<!doctype html", b"<html")
-    ):
-        finder = FeedFinder()
-        finder.feed(raw.decode("utf-8", "replace"))
-        for link in finder.links[:5]:
-            candidate = urljoin(final, link)
-            try:
-                validate_url(candidate)
-                candidates.append(candidate)
-            except providers.ProviderError:
-                pass
-        if not candidates:
-            raise providers.ProviderError(
-                "Esse site não divulga um RSS nesta página. Cole o endereço exato do feed."
-            )
-        raw, _, final = public_fetch(candidates[0])
-    title, items = parse_feed(raw, final)
+        kind = "ibge"
+        final = url
+        candidates = []
+    else:
+        title, items, final, kind, candidates = read_public_news(url)
     return {
         "resolved_url": final,
         "title": title,
         "items": items[:3],
         "candidates": candidates,
+        "kind": kind,
     }
 
 
@@ -363,8 +569,8 @@ def load_feed(source):
             if item:
                 items.append(item)
         return "IBGE", items
-    raw, _, final = public_fetch(source["url"])
-    return parse_feed(raw, final)
+    title, items, *_ = read_public_news(source["url"])
+    return title, items
 
 
 @router.post("/bootstrap")
@@ -415,7 +621,7 @@ def add_source(
         owner_id=user.id,
         **data.model_dump(exclude={"url"}),
         url=result["resolved_url"],
-        kind="ibge" if data.url == DEFAULTS[2][2] else "rss",
+        kind=result.get("kind", "rss"),
         cached_items=None,
     )
     db.add(row)
@@ -432,13 +638,17 @@ def edit_source(
     user: User = Depends(current_user),
 ):
     row = active_source(db, user, identity)
+    if row.builtin_key:
+        raise HTTPException(
+            422, "Fonte padrão: use o cadastro avançado para adicionar uma alternativa."
+        )
     if data.url != row.url:
         try:
             result = preview_url(data.url)
         except providers.ProviderError as e:
             raise HTTPException(422, str(e))
         row.url = result["resolved_url"]
-        row.kind = "ibge" if data.url == DEFAULTS[2][2] else "rss"
+        row.kind = result.get("kind", "rss")
         row.cached_items = None
         row.checked_at = None
     row.name = data.name
@@ -454,6 +664,8 @@ def delete_source(
     identity: str, db: Session = Depends(get_db), user: User = Depends(current_user)
 ):
     row = active_source(db, user, identity)
+    if row.builtin_key:
+        raise HTTPException(422, "As três fontes padrão de cada categoria são fixas.")
     row.deleted_at = now()
     invalidate(db, user)
     db.commit()
@@ -584,7 +796,7 @@ def aggregate(db, user, config, start, end, refresh=False):
             for s in sources
             if normalize(s.category) == normalize(config.news_category)
         ]
-    sources = sources[:6]
+    sources = sources[:30]
     if not sources:
         return {
             "status": "needs_config",
